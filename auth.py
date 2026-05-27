@@ -13,6 +13,7 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from billing import ensure_usage_row, usage_summary
 from db import fetch_one, execute
 
 bp = Blueprint("auth", __name__)
@@ -30,7 +31,10 @@ def current_user() -> dict[str, Any] | None:
     uid = current_user_id()
     if not uid:
         return None
-    return fetch_one("SELECT id, username, email, created_at FROM users WHERE id = %s", (uid,))
+    return fetch_one(
+        "SELECT id, username, email, plan_tier, created_at FROM users WHERE id = %s",
+        (uid,),
+    )
 
 
 def login_required(fn):
@@ -42,12 +46,16 @@ def login_required(fn):
     return wrapper
 
 
-def _serialize_user(row: dict[str, Any]) -> dict[str, Any]:
-    return {
+def _serialize_user(row: dict[str, Any], usage: dict[str, Any] | None = None) -> dict[str, Any]:
+    data = {
         "id": row["id"],
         "username": row["username"],
         "email": row.get("email"),
+        "planTier": (row.get("plan_tier") or "free").lower(),
     }
+    if usage:
+        data["usage"] = usage
+    return data
 
 
 def _validate_credentials(payload: dict[str, Any]) -> tuple[str, str, str | None] | tuple[None, None, None]:
@@ -65,11 +73,14 @@ def me():
     user = current_user()
     if not user:
         return jsonify({"ok": False, "error": "Not signed in."}), 401
-    return jsonify({"ok": True, "user": _serialize_user(user)})
+    usage = usage_summary(user["id"], user.get("plan_tier"))
+    return jsonify({"ok": True, "user": _serialize_user(user, usage)})
 
 
-@bp.route("/api/auth/register", methods=["POST"])
+@bp.route("/api/auth/register", methods=["POST", "OPTIONS"])
 def register():
+    if request.method == "OPTIONS":
+        return ("", 204)
     current_app.logger.info("POST /api/auth/register")
     payload = request.get_json(silent=True) or {}
     username, password, email = _validate_credentials(payload)
@@ -94,27 +105,31 @@ def register():
     row = fetch_one(
         "INSERT INTO users (username, email, password_hash) "
         "VALUES (%s, %s, %s) "
-        "RETURNING id, username, email, created_at",
+        "RETURNING id, username, email, plan_tier, created_at",
         (username, email, password_hash),
     )
     if not row:
         return jsonify({"ok": False, "error": "Failed to create account."}), 500
+    ensure_usage_row(int(row["id"]))
 
     session.clear()
     session["uid"] = row["id"]
     session.permanent = True
-    return jsonify({"ok": True, "user": _serialize_user(row)})
+    usage = usage_summary(int(row["id"]), row.get("plan_tier"))
+    return jsonify({"ok": True, "user": _serialize_user(row, usage)})
 
 
-@bp.route("/api/auth/login", methods=["POST"])
+@bp.route("/api/auth/login", methods=["POST", "OPTIONS"])
 def login():
+    if request.method == "OPTIONS":
+        return ("", 204)
     payload = request.get_json(silent=True) or {}
     username, password, _ = _validate_credentials(payload)
     if not username:
         return jsonify({"ok": False, "error": "Username and password are required."}), 400
 
     row = fetch_one(
-        "SELECT id, username, email, password_hash FROM users WHERE username = %s",
+        "SELECT id, username, email, password_hash, plan_tier FROM users WHERE username = %s",
         (username,),
     )
     if not row or not check_password_hash(row["password_hash"], password):
@@ -123,7 +138,8 @@ def login():
     session.clear()
     session["uid"] = row["id"]
     session.permanent = True
-    return jsonify({"ok": True, "user": _serialize_user(row)})
+    usage = usage_summary(int(row["id"]), row.get("plan_tier"))
+    return jsonify({"ok": True, "user": _serialize_user(row, usage)})
 
 
 @bp.route("/api/auth/logout", methods=["POST"])

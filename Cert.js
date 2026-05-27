@@ -4,12 +4,12 @@
 
 // ---------------------------------------------------------------------------
 // API routing
-// Talks to server.py. By default API requests go to http://127.0.0.1:5000
+// Talks to server.py. By default API requests go to http://127.0.0.1:5001
 // (the Flask server) when this page is hosted by XAMPP/Apache or file://.
 // Override by setting window.QUIZ_API_BASE before this script.
 // ---------------------------------------------------------------------------
-const QUIZ_API_DEFAULT_HOSTS = ['127.0.0.1:5000', 'localhost:5000'];
-const QUIZ_API_DEFAULT_BASE = 'http://127.0.0.1:5000';
+const QUIZ_API_DEFAULT_HOSTS = ['127.0.0.1:5001', 'localhost:5001'];
+const QUIZ_API_DEFAULT_BASE = 'http://127.0.0.1:5001';
 
 function quizApiUrl(path) {
     let base = (typeof window !== 'undefined') ? window.QUIZ_API_BASE : undefined;
@@ -20,7 +20,7 @@ function quizApiUrl(path) {
             base = '';
         } else if (typeof window !== 'undefined'
             && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-            base = window.location.protocol + '//' + window.location.hostname + ':5000';
+            base = window.location.protocol + '//' + window.location.hostname + ':5001';
         } else {
             base = QUIZ_API_DEFAULT_BASE;
         }
@@ -235,6 +235,23 @@ const QSetStore = (function () {
 let currentUser = null;
 let authMode = 'signin'; // 'signin' | 'signup'
 
+function isGenerationLimitReached() {
+    const usage = currentUser && currentUser.usage;
+    if (!usage) return false;
+    const used = Number(usage.generationsUsed || 0);
+    const limit = Number(usage.generationsLimit || 0);
+    return limit > 0 && used >= limit;
+}
+
+function usageBadgeText() {
+    const usage = currentUser && currentUser.usage;
+    if (!usage) return '';
+    const tier = (currentUser.planTier || usage.planTier || 'free').toUpperCase();
+    const used = Number(usage.generationsUsed || 0);
+    const limit = Number(usage.generationsLimit || 0);
+    return tier + ' ' + used + '/' + limit + ' generations';
+}
+
 function _authFetch(url, opts) {
     const o = Object.assign({ credentials: 'include' }, opts || {});
     if (o.body && !(o.body instanceof FormData)) {
@@ -358,9 +375,15 @@ function hideAuthOverlay() {
 function paintUserPill() {
     const pill = document.getElementById('userPill');
     const name = document.getElementById('userPillName');
+    const usage = document.getElementById('userPlanUsage');
     if (pill && currentUser) {
         pill.style.display = 'inline-flex';
         if (name) name.textContent = currentUser.username;
+        if (usage) {
+            const txt = usageBadgeText();
+            usage.style.display = txt ? 'inline-flex' : 'none';
+            usage.textContent = txt;
+        }
     }
 }
 
@@ -1540,7 +1563,13 @@ function resetAnalysisState() {
 function updateGenerateButton() {
     const btn = document.getElementById('uploadPdfBtn');
     if (!btn) return;
+    if (isGenerationLimitReached()) {
+        btn.disabled = true;
+        btn.title = 'You have used all monthly generations for your current plan.';
+        return;
+    }
     btn.disabled = !(selectedPdfFile && analysisData && selectedQuestionCount);
+    if (!btn.disabled) btn.removeAttribute('title');
 }
 
 function renderChips(analysis) {
@@ -1771,6 +1800,14 @@ function sleep(ms) {
 }
 
 async function uploadPdf() {
+    if (isGenerationLimitReached()) {
+        setUploadStatus(
+            'You have used all your monthly generations. Upgrade your plan to continue.',
+            'error'
+        );
+        return;
+    }
+
     if (!selectedPdfFile) {
         setUploadStatus('Please choose a PDF first.', 'error');
         return;
@@ -1833,6 +1870,12 @@ async function uploadPdf() {
         let detail;
         if (data && data.error) {
             detail = data.error;
+            if (data.usage && currentUser) {
+                currentUser.usage = data.usage;
+                if (data.usage.planTier) currentUser.planTier = data.usage.planTier;
+                paintUserPill();
+                updateGenerateButton();
+            }
         } else {
             const snippet = (bodyText || '').replace(/\s+/g, ' ').trim().slice(0, 200);
             detail = snippet || 'No response body';

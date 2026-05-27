@@ -50,6 +50,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from psycopg2.extras import Json
 
 from backend import DEFAULT_OUTPUT, SCRIPT_DIR, analyze, generate
+from billing import increment_usage, plan_limits, usage_summary
 from auth import bp as auth_bp, current_user_id, login_required
 from data_routes import bp as data_bp, _new_set_id
 from db import cursor, execute, fetch_one, init_schema
@@ -232,6 +233,7 @@ class JobManager:
                 "ON CONFLICT (owner_id) DO UPDATE SET set_id = EXCLUDED.set_id, updated_at = NOW()",
                 (owner_id, set_id),
             )
+        increment_usage(owner_id, produced)
         return set_id
 
     def _run(self, job_id: str, owner_id: int, pdf_path: Path,
@@ -321,6 +323,20 @@ def api_generate():
     if request.method == "OPTIONS":
         return ("", 204)
 
+    owner_id = current_user_id()
+    user = fetch_one("SELECT id, plan_tier FROM users WHERE id = %s", (owner_id,))
+    if not user:
+        return jsonify({"ok": False, "error": "Not signed in."}), 401
+    limits = plan_limits(user.get("plan_tier"))
+    usage = usage_summary(owner_id, user.get("plan_tier"))
+    if usage["generationsUsed"] >= usage["generationsLimit"]:
+        return jsonify({
+            "ok": False,
+            "code": "USAGE_LIMIT",
+            "error": "You have reached your monthly generation limit. Please upgrade your plan.",
+            "usage": usage,
+        }), 403
+
     if "pdf" not in request.files:
         return jsonify({"ok": False, "error": 'No file uploaded (expected field "pdf").'}), 400
 
@@ -331,8 +347,16 @@ def api_generate():
             count = int(count_raw)
         except ValueError:
             return jsonify({"ok": False, "error": "count must be an integer."}), 400
-        if count < 1 or count > 200:
-            return jsonify({"ok": False, "error": "count must be between 1 and 200."}), 400
+        max_q = int(limits["max_questions_per_gen"])
+        if count < 1 or count > max_q:
+            return jsonify({
+                "ok": False,
+                "code": "PLAN_QUESTION_LIMIT",
+                "error": f"Your plan allows up to {max_q} questions per generation.",
+                "usage": usage,
+            }), 403
+    else:
+        count = int(limits["max_questions_per_gen"])
 
     upload = request.files["pdf"]
     filename = upload.filename or "upload.pdf"
@@ -341,7 +365,6 @@ def api_generate():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
-    owner_id = current_user_id()
     job_id = job_manager.submit(owner_id, tmp_path, count, filename)
     return jsonify({"ok": True, "jobId": job_id})
 
@@ -361,4 +384,4 @@ def api_generate_status(job_id: str):
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5001, debug=False)
