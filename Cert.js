@@ -4,8 +4,8 @@
 
 // ---------------------------------------------------------------------------
 // API routing
-// Talks to server.py. By default API requests go to http://127.0.0.1:5001
-// (the Flask server) when this page is hosted by XAMPP/Apache or file://.
+// Talks to server.py. By default API requests use same-origin when hosted
+// (e.g. Render), and fallback to http://127.0.0.1:5001 for local file:// use.
 // Override by setting window.QUIZ_API_BASE before this script.
 // ---------------------------------------------------------------------------
 const QUIZ_API_DEFAULT_HOSTS = ['127.0.0.1:5001', 'localhost:5001'];
@@ -18,11 +18,13 @@ function quizApiUrl(path) {
             && QUIZ_API_DEFAULT_HOSTS.indexOf(window.location.host) !== -1;
         if (onFlask) {
             base = '';
+        } else if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+            base = QUIZ_API_DEFAULT_BASE;
         } else if (typeof window !== 'undefined'
             && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
             base = window.location.protocol + '//' + window.location.hostname + ':5001';
         } else {
-            base = QUIZ_API_DEFAULT_BASE;
+            base = window.location.origin;
         }
     }
     return base.replace(/\/$/, '') + path;
