@@ -1,6 +1,6 @@
 """PostgreSQL connection helpers + schema bootstrap.
 
-Connection is configured via the POSTGRES_DSN env var, e.g.
+Connection is configured via POSTGRES_DSN (local) or DATABASE_URL (Render), e.g.
     POSTGRES_DSN=postgresql://apeq:apeq@localhost:5432/apeq
 
 All operations use short-lived connections; pooling is not needed for the
@@ -26,8 +26,10 @@ SCHEMA_PATH = SCRIPT_DIR / "schema.sql"
 def _dsn() -> str:
     dsn = os.getenv("POSTGRES_DSN", "").strip()
     if not dsn:
+        dsn = os.getenv("DATABASE_URL", "").strip()
+    if not dsn:
         raise RuntimeError(
-            "POSTGRES_DSN is not set. Add it to your .env, e.g.\n"
+            "No PostgreSQL DSN found. Set POSTGRES_DSN (local) or DATABASE_URL (Render), e.g.\n"
             "    POSTGRES_DSN=postgresql://apeq:apeq@localhost:5432/apeq"
         )
     return dsn

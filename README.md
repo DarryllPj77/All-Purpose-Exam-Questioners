@@ -132,6 +132,41 @@ git push -u origin main
 
 A 405 error usually means the frontend is sending the wrong HTTP method or calling the wrong route, or the Flask backend route does not allow `POST`. Check that your frontend request path exactly matches the Flask auth route and that the route explicitly allows `methods=["POST"]`. [web:283][web:289]
 
+## Render Deployment
+
+### 1. Push these files
+
+- `requirements.txt` (includes `gunicorn`, `psycopg2-binary`, etc.)
+- `server.py` with `PORT` support
+- `schema.sql` (applied automatically on app start via `init_schema()`)
+
+### 2. Create PostgreSQL on Render
+
+1. Render Dashboard -> `New +` -> `PostgreSQL`
+2. Copy the generated `Internal Database URL`
+
+### 3. Create Web Service on Render
+
+1. Render Dashboard -> `New +` -> `Web Service`
+2. Connect your repository and branch
+3. Set:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn server:app`
+
+### 4. Environment Variables
+
+Set these in Render:
+
+- `DATABASE_URL` = your Render PostgreSQL internal URL
+- `OPENROUTER_API_KEY` = your key
+- `FLASK_SECRET_KEY` = long random secret
+- Optional: `PYTHON_VERSION` = your preferred version (for consistent builds)
+
+Notes:
+
+- The app supports both `POSTGRES_DSN` and `DATABASE_URL`; Render should use `DATABASE_URL`.
+- `schema.sql` is applied automatically on boot by `init_schema()`, so manual `psql -f schema.sql` is usually unnecessary.
+
 ## License
 
 Add your preferred license here.
