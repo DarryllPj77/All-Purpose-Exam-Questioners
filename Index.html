@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Purpose Exam Questioners</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="Cert.css">
+</head>
+<body>
+    <div class="credits">
+        <a href="https://github.com/DarryllPj77" target="_blank" rel="noopener">Built by DarryllPj77 · questions are not mine</a>
+    </div>
+
+    <!-- Auth gate: shown while signed-out, hidden after a successful sign in. -->
+    <div id="authOverlay" class="auth-overlay" style="display: flex;" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <section class="auth-card">
+            <header class="auth-card__head">
+                <span class="dashboard-eyebrow">All Purpose Exam Questioners</span>
+                <h2 id="authTitle">Sign in to continue</h2>
+                <p id="authSubtitle">Your question sets and history stay with your account.</p>
+            </header>
+
+            <div class="auth-tabs" role="tablist">
+                <button type="button" class="auth-tab auth-tab--active" id="authTabSignIn" role="tab" aria-selected="true" onclick="setAuthMode('signin')">Sign in</button>
+                <button type="button" class="auth-tab" id="authTabSignUp" role="tab" aria-selected="false" onclick="setAuthMode('signup')">Create account</button>
+            </div>
+
+            <form id="authForm" class="auth-form" autocomplete="on" onsubmit="event.preventDefault(); submitAuth();">
+                <label class="auth-field">
+                    <span class="auth-field__label">Username</span>
+                    <input type="text" id="authUsername" name="username" class="text-input auth-input" autocomplete="username" required minlength="3" maxlength="32">
+                </label>
+                <label class="auth-field" id="authEmailField" style="display: none;">
+                    <span class="auth-field__label">Email <span class="auth-field__hint">(optional)</span></span>
+                    <input type="email" id="authEmail" name="email" class="text-input auth-input" autocomplete="email">
+                </label>
+                <label class="auth-field">
+                    <span class="auth-field__label">Password</span>
+                    <input type="password" id="authPassword" name="password" class="text-input auth-input" autocomplete="current-password" required minlength="6">
+                </label>
+
+                <button type="submit" class="btn btn--primary btn--full" id="authSubmitBtn">Sign in</button>
+                <div id="authStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
+            </form>
+        </section>
+    </div>
+
+    <!-- Signed-in user pill — populated by Cert.js once /api/auth/me succeeds. -->
+    <div id="userPill" class="user-pill" style="display: none;">
+        <span class="user-pill__avatar" aria-hidden="true"></span>
+        <span class="user-pill__name" id="userPillName"></span>
+        <button type="button" class="user-pill__signout" onclick="signOut()" title="Sign out">Sign out</button>
+    </div>
+
+    <main class="container dashboard" id="dashboard" style="display: block;">
+        <section class="dashboard-hero">
+            <span class="dashboard-eyebrow">Reviewer · Practice Suite</span>
+            <h1>All Purpose Exam Questioners</h1>
+            <p class="dashboard-tagline">Pick a study mode, set your time, or drop in a PDF to generate a fresh question set.</p>
+        </section>
+
+        <section class="dashboard-grid">
+            <article class="card card--actions">
+                <header class="card-head">
+                    <h2>Start a session</h2>
+                    <p>Choose how you want to study today.</p>
+                </header>
+
+                <div class="mode-grid" role="radiogroup" aria-label="Session mode">
+                    <button type="button" class="mode-card mode-card--primary" id="examModeCard" role="radio" aria-checked="false" onclick="selectMode('exam')" aria-label="Select exam mode">
+                        <span class="mode-card__check" aria-hidden="true">✓</span>
+                        <span class="mode-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M5 22h14a2 2 0 0 0 2-2V8l-6-6H7a2 2 0 0 0-2 2v2"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="8" cy="16" r="5"/><path d="M8 13.5V16l1.5 1"/></svg>
+                        </span>
+                        <span class="mode-card__title">Exam Mode</span>
+                        <span class="mode-card__sub">Timed run · results at the end</span>
+                    </button>
+                    <button type="button" class="mode-card mode-card--accent" id="startTrainingBtn" role="radio" aria-checked="false" onclick="selectMode('training')" aria-label="Select training mode">
+                        <span class="mode-card__check" aria-hidden="true">✓</span>
+                        <span class="mode-card__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        </span>
+                        <span class="mode-card__title">Training Mode</span>
+                        <span class="mode-card__sub">Instant feedback per question</span>
+                    </button>
+                </div>
+
+                <div id="trainingOptions" class="training-options" style="display: none;">
+                    <label for="timeLimit" class="field-label">Time limit (minutes)</label>
+                    <div class="training-controls">
+                        <input type="number" id="timeLimit" min="1" value="60" class="text-input">
+                        <button type="button" class="btn btn--secondary btn--sm" onclick="setTrainingTime()">Set time</button>
+                        <button type="button" class="btn btn--ghost btn--sm" onclick="setUnlimitedTime()">Unlimited</button>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn--primary btn--full start-selected-btn" id="startSelectedBtn" style="display: none;" onclick="startSelectedMode()">
+                    <span id="startSelectedLabel">Start</span>
+                </button>
+
+                <div class="action-row">
+                    <button type="button" class="btn btn--secondary" id="continueButton" style="display: none;" onclick="continueSession()">
+                        <span aria-hidden="true">↻</span> Continue session
+                    </button>
+                    <button type="button" class="btn btn--ghost-danger" onclick="resetSession()">Reset session</button>
+                </div>
+            </article>
+
+            <article class="card card--upload">
+                <header class="card-head">
+                    <h2>Generate from PDF</h2>
+                    <p>Drop a study PDF — Gemini will draft a new question set for you.</p>
+                </header>
+                <div id="dropZone" class="upload-zone" tabindex="0" role="button" aria-label="Upload a PDF file">
+                    <div class="upload-zone__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <p class="upload-zone-text"><strong>Drop a PDF here</strong> or click to browse</p>
+                    <p class="upload-zone-hint">.pdf only · up to 25 MB</p>
+                    <p id="selectedFileName" class="upload-file-name"></p>
+                    <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" style="display: none;">
+                </div>
+
+                <div id="analysisPanel" class="analysis-panel" style="display: none;">
+                    <div id="analysisLoading" class="analysis-loading">
+                        <span class="analysis-spinner" aria-hidden="true"></span>
+                        <span>Analyzing PDF…</span>
+                    </div>
+                    <div id="analysisResult" class="analysis-result" style="display: none;">
+                        <p id="analysisMessage" class="analysis-message"></p>
+                        <div class="count-picker">
+                            <span class="field-label" id="countPickerLabel">How many questions?</span>
+                            <div class="chip-group" id="countChips" role="radiogroup" aria-labelledby="countPickerLabel">
+                                <button type="button" class="chip" data-count="20" role="radio" aria-checked="false">20</button>
+                                <button type="button" class="chip" data-count="30" role="radio" aria-checked="false">30</button>
+                                <button type="button" class="chip" data-count="40" role="radio" aria-checked="false">40</button>
+                                <button type="button" class="chip" data-count="50" role="radio" aria-checked="false">50</button>
+                                <button type="button" class="chip" data-count="100" role="radio" aria-checked="false">100</button>
+                            </div>
+                            <p id="chipHint" class="chip-hint" aria-live="polite"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn--primary btn--full" id="uploadPdfBtn" onclick="uploadPdf()" disabled>Generate questions</button>
+
+                <div id="generationProgress" class="gen-progress" style="display: none;" role="status" aria-live="polite">
+                    <div class="gen-progress__head">
+                        <span class="gen-progress__phase-dot" aria-hidden="true"></span>
+                        <span class="gen-progress__phase" id="progressPhase">Starting…</span>
+                        <span class="gen-progress__elapsed" id="progressElapsed">0:00</span>
+                    </div>
+                    <div class="gen-progress__bar">
+                        <div class="gen-progress__fill" id="progressFill"></div>
+                    </div>
+                    <p class="gen-progress__message" id="progressMessage"></p>
+                </div>
+
+                <div id="uploadStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
+            </article>
+        </section>
+
+        <section class="card card--qsets" id="questionSetsSection">
+            <header class="card-head">
+                <h2>Question sets</h2>
+                <p>Generated sets are saved on this device. The active set powers your sessions.</p>
+            </header>
+            <div id="questionSetsList" class="qsets-list"></div>
+        </section>
+
+        <section class="card card--history" id="sessionHistory" style="display: block;">
+            <header class="card-head card-head--inline">
+                <div>
+                    <h2>Session history</h2>
+                    <p>Your last attempts on this device.</p>
+                </div>
+                <button type="button" class="btn btn--ghost btn--sm" id="clearHistoryBtn" onclick="clearSessionHistory()">Clear</button>
+            </header>
+            <div id="historyList"></div>
+            <div id="incompleteSessionNotice" class="incomplete-notice" style="display: none;">
+                <span class="incomplete-notice__dot" aria-hidden="true"></span>
+                <span>There's an unfinished session — pick up where you left off.</span>
+            </div>
+        </section>
+    </main>
+
+    <div class="container" id="examContainer" style="display: none;">
+        <div class="header">
+            <h1 id="modeTitle">Exam Mode</h1>
+            <div class="timer" id="timer"></div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+        </div>
+
+        <div class="exam-content" id="examContent">
+            <button class="back-button" onclick="backToDashboard()">← Back to Dashboard</button>
+            <div class="question-card">
+                <div class="question-header">
+                    <div class="question-number" id="questionNumber"></div>
+                </div>
+                <div class="question-text" id="questionText"></div>
+                <div class="choices" id="choices"></div>
+                <div id="trainingFeedback" style="display: none;"></div>
+            </div>
+
+            <div class="navigation">
+                <button class="nav-button nav-button--secondary" id="prevButton" onclick="previousQuestion()">Previous</button>
+                <button class="nav-button" id="nextButton" onclick="nextQuestion()">Next</button>
+                <button class="nav-button submit-button" id="submitButton" style="display: none;" onclick="submitExam()">Submit</button>
+            </div>
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <div class="score-display">
+                <h2 id="scoreTitle">Exam Complete!</h2>
+                <div id="scorePercentage"></div>
+            </div>
+            <div class="score-details">
+                <div class="score-card">
+                    <h3>Total Questions</h3>
+                    <div class="number" id="totalQuestionsCount"></div>
+                </div>
+                <div class="score-card">
+                    <h3>Correct Answers</h3>
+                    <div class="number" id="correctCount">0</div>
+                </div>
+                <div class="score-card">
+                    <h3>Incorrect Answers</h3>
+                    <div class="number" id="incorrectCount">0</div>
+                </div>
+                <div class="score-card">
+                    <h3>Score</h3>
+                    <div class="number" id="finalScore">0%</div>
+                </div>
+            </div>
+            <div class="question-review" id="questionReview"></div>
+            <button class="restart-button" onclick="backToDashboard()">Back to Dashboard</button>
+        </div>
+    </div>
+
+    <div id="fullscreenFeedback" style="display: none;">
+        <h2>Training Feedback</h2>
+        <div id="feedbackContent"></div>
+        <button class="btn btn--primary" onclick="closeFeedback()">Close Feedback</button>
+    </div>
+
+    <script src="questions.js"></script>
+    <script src="Cert.js"></script>
+</body>
+</html>
