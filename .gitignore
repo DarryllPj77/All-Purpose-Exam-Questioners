@@ -35,3 +35,8 @@ dist/
 
 # Logs
 *.log
+
+# Local AI Tooling
+.claude/
+.agents/
+skills-lock.json
