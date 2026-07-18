@@ -230,6 +230,254 @@ const QSetStore = (function () {
     };
 })();
 
+const AI_PROMPT_TEMPLATE = [
+    'Generate a multiple-choice question set based on the text/topic I provide below.',
+    'Return ONLY a raw JavaScript array (no `const`, no comments outside the array, no markdown fences) matching this exact shape.',
+    '',
+    'Example of the required output format:',
+    '[',
+    '  {',
+    '    number: 1,',
+    '    // Topic/Subtopic: XML Fundamentals',
+    '    text: `Which term is used to describe the first line of an XML document?`,',
+    '    choices: {',
+    '      A: `opening`,',
+    '      B: `prologue`,',
+    '      C: `introduction`,',
+    '      D: `preamble`,',
+    '    },',
+    '    answer: ["B"],',
+    '    maxSelections: 1',
+    '  },',
+    '  {',
+    '    number: 2,',
+    '    // Topic/Subtopic: Git File States',
+    '    text: `What are the three states of a Git file? (Choose three.)`,',
+    '    choices: {',
+    '      A: `staged`,',
+    '      B: `modified`,',
+    '      C: `locked`,',
+    '      D: `committed`,',
+    '      E: `deleted`,',
+    '      F: `secured`,',
+    '    },',
+    '    answer: ["A", "B", "D"],',
+    '    maxSelections: 3',
+    '  }',
+    ']',
+    '',
+    'Rules:',
+    '- Multiple-choice ONLY. Use distinct choices labelled A, B, C, D (and E, F if needed).',
+    '- `answer` must be an array of choice letters, e.g., ["B"] or ["A", "B", "D"].',
+    '- `maxSelections` must equal the number of correct answers required.',
+    '- Use backticks (`) around all string values for `text` and `choices` exactly as shown.',
+    '- Each question must be DISTINCT in topic and wording.',
+    '- Number questions sequentially starting at 1.',
+    '',
+    'Here is the topic/text:'
+].join('\n');
+
+let copyPromptResetTimer;
+
+async function copyPromptTemplate() {
+    const button = document.getElementById('copyPromptTemplateBtn');
+
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
+        } else {
+            // Fallback for non-secure pages and older browsers.
+            const temporaryTextarea = document.createElement('textarea');
+            temporaryTextarea.value = AI_PROMPT_TEMPLATE;
+            temporaryTextarea.setAttribute('readonly', '');
+            temporaryTextarea.style.position = 'fixed';
+            temporaryTextarea.style.left = '-9999px';
+            temporaryTextarea.style.opacity = '0';
+            document.body.appendChild(temporaryTextarea);
+            temporaryTextarea.select();
+
+            const copied = document.execCommand('copy');
+            temporaryTextarea.remove();
+
+            if (!copied) {
+                throw new Error('The browser rejected the clipboard request.');
+            }
+        }
+
+        if (button) {
+            clearTimeout(copyPromptResetTimer);
+            button.textContent = 'Copied!';
+            copyPromptResetTimer = setTimeout(() => {
+                button.textContent = 'Copy AI Prompt Template';
+            }, 2000);
+        }
+    } catch (error) {
+        showManualImportStatus(
+            'Unable to copy the prompt. Please check your browser clipboard permissions.',
+            'error'
+        );
+        console.error('Failed to copy the AI prompt:', error);
+    }
+}
+
+function escapeGeneratedTemplateContent(value) {
+    let escaped = '';
+
+    for (let index = 0; index < value.length; index++) {
+        const character = value[index];
+
+        if (character === '`') {
+            let precedingSlashes = 0;
+            for (let slashIndex = index - 1; slashIndex >= 0 && value[slashIndex] === '\\'; slashIndex--) {
+                precedingSlashes++;
+            }
+
+            if (precedingSlashes % 2 === 0) escaped += '\\';
+        }
+
+        escaped += character;
+    }
+
+    // Keep template-expression examples such as ${value} as literal question text.
+    return escaped.replace(/(^|[^\\])\$\{/g, '$1\\${');
+}
+
+function repairGeneratedQuestionStrings(source) {
+    return source.split(/\r?\n/).map((line) => {
+        // The prompt puts each text/choice string on its own line. Treat the
+        // first and last backticks as delimiters and escape any backticks inside.
+        const match = line.match(/^(\s*(?:text|[A-F])\s*:\s*)`(.*)`(\s*,?\s*(?:\/\/.*)?)$/);
+        if (!match) return line;
+
+        return match[1] + '`' + escapeGeneratedTemplateContent(match[2]) + '`' + match[3];
+    }).join('\n');
+}
+
+function parseManualQuestionArray(source) {
+    try {
+        return new Function('return ' + source)();
+    } catch (originalError) {
+        const repairedSource = repairGeneratedQuestionStrings(source);
+
+        if (repairedSource === source) {
+            originalError.manualImportSource = source;
+            throw originalError;
+        }
+
+        try {
+            return new Function('return ' + repairedSource)();
+        } catch (repairedError) {
+            repairedError.manualImportSource = repairedSource;
+            throw repairedError;
+        }
+    }
+}
+
+function formatManualImportParseError(error, originalSource) {
+    const source = error.manualImportSource || originalSource;
+    const parserMessage = error.message || 'Invalid JavaScript syntax';
+    const tokenMatch = parserMessage.match(/Unexpected (?:identifier|token)\s+['"]([^'"]+)['"]/i);
+
+    if (tokenMatch) {
+        const token = tokenMatch[1];
+        const lines = source.split(/\r?\n/);
+        const lineIndex = lines.findIndex((line) => line.includes(token));
+
+        if (lineIndex !== -1) {
+            const linePreview = lines[lineIndex].trim().slice(0, 140);
+            return `Could not parse line ${lineIndex + 1} near "${token}": ${linePreview}. Check for a missing comma, quote, or unmatched backtick.`;
+        }
+    }
+
+    return `Could not parse the pasted array: ${parserMessage}. Check for a missing comma, quote, or unmatched backtick.`;
+}
+
+function importManualSet() {
+    const titleInput = document.getElementById('manualSetTitle');
+    const questionsInput = document.getElementById('manualSetQuestions');
+    const titleValue = titleInput.value.trim();
+    const text = questionsInput.value.trim();
+
+    if (!titleValue) {
+        showManualImportStatus('Please enter a title for the question set.', 'error');
+        titleInput.focus();
+        return;
+    }
+
+    if (!text) {
+        showManualImportStatus('Please paste a JavaScript question array.', 'error');
+        questionsInput.focus();
+        return;
+    }
+
+    try {
+        // This intentionally accepts the backtick strings used by the prompt template.
+        const parsedArray = parseManualQuestionArray(text);
+
+        if (!Array.isArray(parsedArray) || parsedArray.length === 0) {
+            throw new Error('The imported value must be a non-empty array.');
+        }
+
+        const invalidQuestionIndex = parsedArray.findIndex((question) => (
+            !question ||
+            typeof question !== 'object' ||
+            typeof question.text !== 'string' ||
+            !question.text.trim() ||
+            !question.choices ||
+            typeof question.choices !== 'object' ||
+            Array.isArray(question.choices) ||
+            Object.keys(question.choices).length === 0 ||
+            !Array.isArray(question.answer) ||
+            question.answer.length === 0
+        ));
+
+        if (invalidQuestionIndex !== -1) {
+            throw new Error(
+                `Question ${invalidQuestionIndex + 1} must contain valid text, choices, and answer fields.`
+            );
+        }
+
+        const savedSet = QSetStore.save({
+            title: titleValue,
+            source: { type: 'manual-import' },
+            questions: parsedArray
+        });
+
+        if (!savedSet) {
+            throw new Error('The question set could not be saved.');
+        }
+
+        if (typeof renderQuestionSets === 'function') {
+            renderQuestionSets();
+        }
+
+        titleInput.value = '';
+        questionsInput.value = '';
+
+        showManualImportStatus(
+            `"${titleValue}" was saved with ${parsedArray.length} question${parsedArray.length === 1 ? '' : 's'}.`,
+            'success'
+        );
+    } catch (error) {
+        showManualImportStatus(
+            error instanceof SyntaxError
+                ? formatManualImportParseError(error, text)
+                : (error.message || 'The pasted question array could not be imported.'),
+            'error'
+        );
+        console.error('Manual question set import failed:', error);
+    }
+}
+
+function showManualImportStatus(message, type) {
+    const status = document.getElementById('manualImportStatus');
+    if (!status) return;
+
+    status.textContent = message;
+    status.className = `upload-status ${type}`;
+    status.style.display = 'block';
+}
+
 
 // ===========================================================================
 // Auth flow — overlay, sign in/up, sign out.
@@ -693,10 +941,12 @@ function displayQuestion() {
     // visual state in lockstep with userAnswers across re-renders.
     refreshChoiceSelection();
 
-    // Training mode: also paint per-option correct/incorrect feedback so the
-    // right answer is visible on the option card itself, immediately, with no
-    // dashboard or reset-session detour. This is the missing refresh step.
-    if (isTrainingMode && userAnswers[currentQuestion] && userAnswers[currentQuestion].length > 0) {
+    // Restore training feedback only after every required answer is selected.
+    // Partial multi-answer selections keep their selected styling without
+    // revealing which choices are correct.
+    const selectedAnswers = userAnswers[currentQuestion] || [];
+    const hasAllRequiredAnswers = selectedAnswers.length === maxSelections;
+    if (isTrainingMode && hasAllRequiredAnswers) {
         applyTrainingFeedback();
         showQuestionFeedback();
     } else if (isTrainingMode && document.getElementById('trainingFeedback')) {
@@ -721,9 +971,8 @@ function refreshChoiceSelection() {
 }
 
 // Training-mode per-option highlight: green check on correct answers, red X on
-// the user's incorrect picks. Called after every answer change and after every
-// re-render so the right option is visible on the card itself the moment it's
-// known — not buried in a text line below.
+// the user's incorrect picks. Called only after all required answers have been
+// selected, including when a completed answer is restored after a re-render.
 function applyTrainingFeedback() {
     const choicesContainer = document.getElementById('choices');
     if (!choicesContainer) return;
@@ -759,15 +1008,15 @@ function selectAnswer(choice) {
     const question = questions[currentQuestion];
     const maxSelections = question.maxSelections || 1;
 
-    if (!userAnswers[currentQuestion]) {
+    if (!Array.isArray(userAnswers[currentQuestion])) {
         userAnswers[currentQuestion] = [];
     }
 
     const currentAnswers = userAnswers[currentQuestion];
     const choiceIndex = currentAnswers.indexOf(choice);
 
-    if (choiceIndex > -1) {
-        // Toggle off
+    // Toggle the clicked choice without grading a partial multi-answer set.
+    if (choiceIndex !== -1) {
         currentAnswers.splice(choiceIndex, 1);
     } else if (currentAnswers.length < maxSelections) {
         currentAnswers.push(choice);
@@ -780,12 +1029,29 @@ function selectAnswer(choice) {
     refreshChoiceSelection();
 
     if (isTrainingMode) {
-        // Immediately recompute and paint the correct/incorrect option styling.
-        // This is the fix: previously only the text below was updated; the
-        // option cards never got a result class, so the correct answer was
-        // never visually highlighted on the card itself.
-        applyTrainingFeedback();
-        showQuestionFeedback();
+        const readyToGrade =
+            currentAnswers.length > 0 &&
+            currentAnswers.length === maxSelections;
+
+        if (readyToGrade) {
+            applyTrainingFeedback();
+            showQuestionFeedback();
+        } else {
+            // A completed answer can be edited. If it becomes incomplete,
+            // remove the old grading while preserving the selected choices.
+            const choicesContainer = document.getElementById('choices');
+            if (choicesContainer) {
+                choicesContainer.querySelectorAll('.choice').forEach((element) => {
+                    element.classList.remove('choice--correct', 'choice--incorrect');
+                });
+            }
+
+            const feedbackDiv = document.getElementById('trainingFeedback');
+            if (feedbackDiv) {
+                feedbackDiv.innerHTML = '';
+                feedbackDiv.style.display = 'none';
+            }
+        }
     }
 
     saveToStorage();

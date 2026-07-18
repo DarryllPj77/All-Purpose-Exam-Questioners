@@ -162,6 +162,33 @@
 
                 <div id="uploadStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
             </article>
+
+            <article class="card card--import">
+                <header class="card-head">
+                    <h2>Import Question Set</h2>
+                    <p>Copy the AI prompt, generate questions, then paste the raw JavaScript array below.</p>
+                </header>
+
+                <button type="button" class="btn btn--secondary btn--full" id="copyPromptTemplateBtn" onclick="copyPromptTemplate()">
+                    Copy AI Prompt Template
+                </button>
+
+                <div>
+                    <label for="manualSetTitle" class="field-label">Set Title</label>
+                    <input type="text" class="text-input" id="manualSetTitle" placeholder="e.g. XML Fundamentals" autocomplete="off" style="width: 100%;">
+                </div>
+
+                <div>
+                    <label for="manualSetQuestions" class="field-label">JavaScript Question Array</label>
+                    <textarea class="text-input" id="manualSetQuestions" rows="16" spellcheck="false" placeholder="Paste the raw JavaScript array here..." style="width: 100%; min-height: 280px; resize: vertical; font-family: var(--ff-mono);"></textarea>
+                </div>
+
+                <button type="button" class="btn btn--primary btn--full" onclick="importManualSet()">
+                    Save to Question Sets
+                </button>
+
+                <div id="manualImportStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
+            </article>
         </section>
 
         <section class="card card--qsets" id="questionSetsSection">
