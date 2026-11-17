@@ -135,6 +135,33 @@ class ProgressApiTest(unittest.TestCase):
         res = self.alice.get(f"/api/progress/{self.set_id}").get_json()
         self.assertEqual(res["progress"], [])
 
+    # ---- flashcards -----------------------------------------------------------
+
+    def flashcard(self, client, qid, status):
+        return client.put(f"/api/progress/{self.set_id}/flashcards/{qid}", json={"status": status})
+
+    def test_flashcard_status_set_change_and_clear(self):
+        qid = self.qids[0]
+        self.assertEqual(self.flashcard(self.alice, qid, "know").get_json()["status"], "know")
+        self.assertEqual(self.flashcard(self.alice, qid, "learning").get_json()["status"], "learning")
+        rows = {p["questionId"]: p for p in self.alice.get(f"/api/progress/{self.set_id}").get_json()["progress"]}
+        self.assertEqual(rows[qid]["flashcard"]["status"], "learning")
+        self.assertIsNone(self.flashcard(self.alice, qid, None).get_json()["status"])
+
+    def test_flashcard_status_leaves_other_modes_alone(self):
+        qid = self.qids[0]
+        self.flashcard(self.alice, qid, "know")
+        row = self.alice.get(f"/api/progress/{self.set_id}").get_json()["progress"][0]
+        self.assertIsNone(row["learn"]["stage"])
+        self.assertEqual(row["learn"]["streak"], 0)
+        self.assertIsNone(row["review"]["dueAt"])
+        self.assertFalse(row["mistake"]["open"])
+
+    def test_flashcard_status_validation(self):
+        self.assertEqual(self.flashcard(self.alice, self.qids[0], "mastered").status_code, 400)
+        self.assertEqual(self.flashcard(self.alice, "q_notinthisset", "know").status_code, 400)
+        self.assertEqual(self.flashcard(self.bob, self.qids[0], "know").status_code, 404)
+
     # ---- study sessions -------------------------------------------------------
 
     def test_study_session_round_trip(self):
@@ -171,7 +198,8 @@ class ProgressApiTest(unittest.TestCase):
 class StaticFilesTest(unittest.TestCase):
     def test_only_app_files_are_served(self):
         client = server.app.test_client()
-        for path in ("/", "/Cert.css", "/Cert.js", "/questions.js", "/js/core/learning.js", "/js/shell.js"):
+        for path in ("/", "/Cert.css", "/Cert.js", "/questions.js", "/js/core/learning.js", "/js/shell.js",
+                     "/js/modes/flashcards.js"):
             with client.get(path) as res:
                 self.assertEqual(res.status_code, 200, path)
         for path in ("/.env", "/server.py", "/schema.sql", "/.git/config", "/learning_config.py",

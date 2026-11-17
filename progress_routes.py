@@ -8,6 +8,7 @@ Routes (all login_required, all filtered by the signed-in user):
   GET    /api/study-sessions/<set_id>/<mode>     → resumable mode state
   PUT    /api/study-sessions/<set_id>/<mode>     → save mode state
   DELETE /api/study-sessions/<set_id>/<mode>     → discard mode state
+  PUT    /api/progress/<set_id>/flashcards/<question_id> → Know / Still learning
 
 Mode-specific progress columns (flashcard status, Learn stage, review
 schedule, ...) are written by each mode's own endpoint as it is built, so
@@ -25,7 +26,7 @@ from psycopg2.extras import Json
 
 from auth import current_user_id, login_required
 from db import cursor, execute, fetch_all, fetch_one
-from learning_config import ATTEMPT_OUTCOMES, STUDY_MODES, public_config
+from learning_config import ATTEMPT_OUTCOMES, FLASHCARD_STATUSES, STUDY_MODES, public_config
 from question_ids import QUESTION_ID_RE
 
 bp = Blueprint("progress", __name__)
@@ -109,6 +110,47 @@ def get_progress(set_id: str):
             "updatedAt": _iso(r["updated_at"]),
         })
     return jsonify({"ok": True, "setId": set_id, "progress": progress})
+
+
+# ============================================================
+# Flashcards: self-reported familiarity (never treated as mastery)
+# ============================================================
+
+@bp.route("/api/progress/<set_id>/flashcards/<question_id>", methods=["PUT"])
+@login_required
+def put_flashcard_status(set_id: str, question_id: str):
+    if not SET_ID_RE.match(set_id):
+        return _error("Bad set id.")
+    if not QUESTION_ID_RE.match(question_id):
+        return _error("Bad question id.")
+    uid = current_user_id()
+    valid_ids = _set_question_ids(uid, set_id)
+    if valid_ids is None:
+        return _error("Not found.", 404)
+    if question_id not in valid_ids:
+        return _error("That question is not in this set.")
+
+    payload = request.get_json(silent=True) or {}
+    status = payload.get("status")
+    if status is not None and status not in FLASHCARD_STATUSES:
+        return _error("status must be 'learning', 'know' or null.")
+
+    # Only the flashcard columns are written; other modes' progress is untouched.
+    row = fetch_one(
+        """
+        INSERT INTO question_progress
+            (owner_id, set_id, question_id, flashcard_status, flashcard_updated_at)
+        VALUES (%s, %s, %s, %s, NOW())
+        ON CONFLICT (owner_id, set_id, question_id) DO UPDATE SET
+            flashcard_status = EXCLUDED.flashcard_status,
+            flashcard_updated_at = NOW(),
+            updated_at = NOW()
+        RETURNING flashcard_status, flashcard_updated_at
+        """,
+        (uid, set_id, question_id, status),
+    )
+    return jsonify({"ok": True, "questionId": question_id,
+                    "status": row["flashcard_status"], "updatedAt": _iso(row["flashcard_updated_at"])})
 
 
 # ============================================================

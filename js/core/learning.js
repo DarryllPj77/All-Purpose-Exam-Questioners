@@ -86,8 +86,18 @@
             }
             return configPromise;
         },
+        /** Full set straight from the server (questions always carry ids). */
+        getSet(setId) {
+            return request('/api/sets/' + enc(setId)).then((d) => d.set);
+        },
         getProgress(setId) {
             return request('/api/progress/' + enc(setId)).then((d) => d.progress);
+        },
+        /** status: 'know' | 'learning' | null (clears the label). */
+        setFlashcardStatus(setId, questionId, status) {
+            return request('/api/progress/' + enc(setId) + '/flashcards/' + enc(questionId), {
+                method: 'PUT', body: { status },
+            });
         },
         /** attempts: [{questionId, mode, outcome, response?, clientAttemptId?}] */
         recordAttempts(setId, attempts) {

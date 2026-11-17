@@ -9,6 +9,10 @@ function isExamVisible() {
     return !!exam && exam.style.display !== 'none';
 }
 
+function isFlashcardsOpen() {
+    return !!(window.Quizer && Quizer.flashcards && Quizer.flashcards.isOpen());
+}
+
 function isResultsVisible() {
     const results = document.getElementById('results');
     return !!results && results.style.display !== 'none' && isExamVisible();
@@ -28,7 +32,10 @@ function syncAppBar() {
     const eyebrow = document.getElementById('appBarEyebrow');
     const title = document.getElementById('appBarTitle');
     if (!eyebrow || !title) return;
-    if (isResultsVisible()) {
+    if (isFlashcardsOpen()) {
+        eyebrow.textContent = 'Flashcards';
+        title.textContent = Quizer.flashcards.title() || activeQuestionSetTitle();
+    } else if (isResultsVisible()) {
         eyebrow.textContent = isTrainingMode ? 'Training results' : 'Exam results';
         title.textContent = activeQuestionSetTitle();
     } else if (isExamVisible()) {
@@ -142,6 +149,7 @@ function setActiveNav(target) {
 function navigateToSection(target) {
     // Leaving a live session keeps it resumable (same as "Save and exit").
     if (isExamVisible()) backToDashboard();
+    if (isFlashcardsOpen()) Quizer.flashcards.close();
     const feedback = document.getElementById('fullscreenFeedback');
     if (feedback && feedback.style.display !== 'none') closeFeedback();
     setActiveNav(target);
@@ -159,7 +167,7 @@ function watchSectionsForNav() {
     const visible = new Map();
     const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0));
-        if (isExamVisible()) return;
+        if (isExamVisible() || isFlashcardsOpen()) return;
         if (window.scrollY < 80) { setActiveNav('dashboard'); return; }
         let best = null; let bestRatio = 0;
         ids.forEach((id) => { const r = visible.get(id) || 0; if (r > bestRatio) { best = id; bestRatio = r; } });
@@ -189,7 +197,7 @@ function watchSectionsForNav() {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.side-nav__link[data-nav-target]').forEach((link) => {
+    document.querySelectorAll('.side-nav__link[data-nav-target]:not([data-open-view])').forEach((link) => {
         link.addEventListener('click', (event) => {
             event.preventDefault();
             navigateToSection(link.dataset.navTarget);

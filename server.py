@@ -110,7 +110,7 @@ def index():
 # never be served, so this is an allow-list, not a path check.
 PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
-    "js/core/learning.js", "js/shell.js",
+    "js/core/learning.js", "js/shell.js", "js/modes/flashcards.js",
 })
 
 

@@ -61,6 +61,7 @@
                 <a class="side-nav__link" href="#studyCard" data-nav-target="studyCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span>Study session</span></a>
                 <a class="side-nav__link" href="#generateCard" data-nav-target="generateCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Generate from PDF</span></a>
                 <a class="side-nav__link" href="#importCard" data-nav-target="importCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg><span>Import a set</span></a>
+                <a class="side-nav__link" href="#flashcards" data-nav-target="flashcardsView" data-open-view="flashcards"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg><span>Flashcards</span></a>
                 <p class="side-nav__label">Your data</p>
                 <a class="side-nav__link" href="#questionSetsSection" data-nav-target="questionSetsSection"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v15H6a2 2 0 0 0-2 2z"/><path d="M6 21h12"/><path d="M8 7h6"/></svg><span>Question library</span></a>
                 <a class="side-nav__link" href="#sessionHistory" data-nav-target="sessionHistory"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg><span>Performance history</span></a>
@@ -249,6 +250,24 @@
             </article>
         </section>
 
+        <section class="card card--modes" id="studyModes" aria-labelledby="studyModesTitle">
+            <header class="card-head">
+                <h2 id="studyModesTitle">Study modes</h2>
+                <p>Self-paced ways to learn your active question set. No timer, and your place is saved.</p>
+            </header>
+            <div class="mode-tiles">
+                <button type="button" class="mode-tile" data-open-view="flashcards">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Flashcards</span>
+                        <span class="mode-tile__desc">See a question, recall the answer, flip to check. Mark each card Know or Still learning.</span>
+                        <span class="mode-tile__meta" id="fcTileMeta">Uses your active question set</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
+            </div>
+        </section>
+
         <section class="card card--qsets" id="questionSetsSection">
             <header class="card-head">
                 <h2>Question library</h2>
@@ -385,6 +404,73 @@
         </aside>
       </div>
     </div>
+
+    <section class="mode-view" id="flashcardsView" aria-labelledby="fcTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Flashcards</span>
+                <h1 id="fcTitle">Flashcards</h1>
+                <p class="mode-head__meta" id="fcMeta">Self-paced, no timer</p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--ghost btn--sm" id="fcShuffle" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg><span>Shuffle</span></button>
+                <button type="button" class="btn btn--ghost btn--sm" id="fcRestart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span>Restart</span></button>
+                <button type="button" class="btn btn--ghost btn--sm" id="fcSpeak" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg><span>Read aloud</span></button>
+                <button type="button" class="btn btn--secondary btn--sm" id="fcExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="fcState" role="status" hidden></div>
+
+        <div class="fc-body" id="fcBody" hidden>
+            <div class="fc-toolbar">
+                <div class="fc-filters" role="group" aria-label="Show cards">
+                    <button type="button" class="fc-filter is-active" data-fc-filter="all" aria-pressed="true">All <span class="fc-filter__count">0</span></button>
+                    <button type="button" class="fc-filter" data-fc-filter="learning" aria-pressed="false">Still learning <span class="fc-filter__count">0</span></button>
+                    <button type="button" class="fc-filter" data-fc-filter="know" aria-pressed="false">Know <span class="fc-filter__count">0</span></button>
+                    <button type="button" class="fc-filter" data-fc-filter="unmarked" aria-pressed="false">Not marked <span class="fc-filter__count">0</span></button>
+                </div>
+                <div class="fc-progress">
+                    <div class="fc-progress__row">
+                        <span id="fcKnowLabel">0 of 0 marked Know</span>
+                        <span id="fcViewed">0 of 0 viewed</span>
+                    </div>
+                    <div class="fc-progress__track" role="progressbar" aria-label="Cards marked Know" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="fc-progress__fill" id="fcKnowBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui-state ui-state--empty" id="fcFilterEmpty" role="status" hidden></div>
+
+            <div class="fc-stage" id="fcStage">
+                <button type="button" class="fc-card" id="fcCard" aria-pressed="false" aria-describedby="fcHint">
+                    <span class="fc-face fc-face--front" id="fcFront">
+                        <span class="fc-face__label">Question</span>
+                        <span class="fc-face__text" id="fcFrontText"></span>
+                        <span class="fc-face__cue">Tap or press Space to show the answer</span>
+                    </span>
+                    <span class="fc-face fc-face--back" id="fcBack" aria-hidden="true">
+                        <span class="fc-face__label">Answer</span>
+                        <span class="fc-answers" id="fcBackList" role="list"></span>
+                    </span>
+                </button>
+            </div>
+
+            <div class="fc-controls">
+                <button type="button" class="btn btn--secondary" id="fcPrev"><span aria-hidden="true">&#8249;</span> Previous</button>
+                <span class="fc-position" id="fcPosition" aria-hidden="true">1 of 1</span>
+                <button type="button" class="btn btn--secondary" id="fcNext">Next <span aria-hidden="true">&#8250;</span></button>
+            </div>
+            <div class="fc-rate" role="group" aria-label="How well do you know this card?">
+                <button type="button" class="btn fc-rate__btn fc-rate__btn--learning" id="fcLearning" aria-pressed="false">Still learning</button>
+                <button type="button" class="btn btn--primary fc-flip" id="fcFlip">Show answer</button>
+                <button type="button" class="btn fc-rate__btn fc-rate__btn--know" id="fcKnow" aria-pressed="false">Know it</button>
+            </div>
+            <p class="fc-hint" id="fcHint">Keys: <kbd>&larr;</kbd> <kbd>&rarr;</kbd> move, <kbd>Space</kbd> flip, <kbd>K</kbd> know, <kbd>L</kbd> still learning, <kbd>Esc</kbd> exit. On a phone, swipe the card.</p>
+            <p class="sr-only" id="fcLive" aria-live="polite"></p>
+        </div>
+    </section>
         </div>
     </div>
 
@@ -433,5 +519,6 @@
     <script src="questions.js"></script>
     <script src="Cert.js"></script>
     <script src="js/shell.js"></script>
+    <script src="js/modes/flashcards.js"></script>
 </body>
 </html>

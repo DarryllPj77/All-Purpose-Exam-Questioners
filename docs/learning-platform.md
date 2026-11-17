@@ -9,8 +9,8 @@ only what is implemented and verified; planned work is listed separately.
 |---|---|---|
 | 0 | Repository audit and plan | Done |
 | 0.5 | Static files restricted to an allow-list (`.env`, source and `.git` were public) | Committed (`9d39483`) |
-| 1 | Foundation: question ids, progress data model and API, shared JS core, scoped sessions, tests | Committed |
-| 2 | Flashcards | Planned |
+| 1 | Foundation: question ids, progress data model and API, shared JS core, scoped sessions, tests | Committed (`b6a9e2e`) |
+| 2 | Flashcards | Committed |
 | 3 | Practice test | Planned |
 | 4 | Mistake review | Planned |
 | 5 | Learn mode | Planned |
@@ -31,8 +31,11 @@ only what is implemented and verified; planned work is listed separately.
 * **Frontend:** plain scripts, no build step, loaded in this order:
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `questions.js`, `Cert.js` (existing exam and training engine),
-  `js/shell.js` (sidebar, header and question navigator). New modes go in
-  `js/modes/<mode>.js`.
+  `js/shell.js` (sidebar, header and question navigator), then one file per
+  study mode in `js/modes/` (currently `flashcards.js`).
+* **Study mode views:** each mode is a full-page view inside the app shell,
+  opened from a tile in the dashboard's "Study modes" section or from the
+  sidebar. Opening a view hides the dashboard; any sidebar link closes it.
 * **Static files:** only the files listed in `PUBLIC_FILES` in `server.py`
   are served. Add new front-end files there.
 
@@ -79,6 +82,30 @@ was altered or dropped. Deleting a question set deletes its learning data.
 
 These are starting defaults, not proven-optimal values.
 
+## Flashcards (Phase 2)
+
+* **Front:** the question. **Back:** each correct choice with its explanation.
+* **Labels:** "Know" and "Still learning" are self-reported, saved to
+  `question_progress.flashcard_status`, and pressing the same label again
+  clears it. They are never treated as mastery by any other mode.
+* **Deck:** Previous/Next never wrap or skip. Filters show All, Still
+  learning, Know or Not marked; a card whose label changes stays on screen
+  until the filter is applied again. Shuffle keeps every card and the current
+  one first; turning it off restores the set's order. Restart clears the
+  viewed count only, never labels.
+* **Resume:** order, filter, current card, viewed cards and shuffle are saved
+  to `study_sessions` (mode `flashcards`) 0.6 s after each change and on
+  exit. Opening waits for any save still in flight, and a saved session is
+  reconciled with the set: removed questions are dropped, new ones appended,
+  corrupt values replaced, and an empty saved filter falls back to All.
+* **Answer log:** the first flip of a card in a session records a `revealed`
+  attempt (batched). It counts as reviewed, never as correct or incorrect.
+* **Input:** tap or Space flips; arrows move; K and L set labels; Escape
+  exits; on touch screens a horizontal swipe moves between cards.
+* **Read aloud:** the browser's built-in speech synthesis reads the visible
+  side; no external service. The button is hidden where it is unsupported.
+* **Reduced motion:** the faces swap without the 3D turn.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -103,6 +130,7 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/progress/<setId>/attempts` | Record up to 200 answers |
 | GET | `/api/progress/<setId>/attempts` | Answer history (`questionId`, `mode`, `limit` filters) |
 | GET / PUT / DELETE | `/api/study-sessions/<setId>/<mode>` | Resumable state (200 KB max) |
+| PUT | `/api/progress/<setId>/flashcards/<questionId>` | Set or clear a flashcard label (`know`, `learning`, `null`) |
 
 ## Tests
 
