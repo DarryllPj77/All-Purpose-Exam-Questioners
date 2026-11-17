@@ -2,7 +2,7 @@
 
 Routes:
   GET  /                               → serves Index.html
-  GET  /<file>                         → serves any project file
+  GET  /<file>                         → serves Cert.css, Cert.js, questions.js only
 
   POST /api/auth/register              → create account + sign in
   POST /api/auth/login                 → sign in
@@ -98,11 +98,16 @@ def index():
     return send_from_directory(SCRIPT_DIR, "Index.html")
 
 
+# Only the files the page itself loads are public. Everything else in the
+# project folder (.env, *.py, schema.sql, .git/, uploaded PDFs, logs) must
+# never be served, so this is an allow-list, not a path check.
+PUBLIC_FILES = frozenset({"Index.html", "Cert.css", "Cert.js", "questions.js"})
+
+
 @app.route("/<path:filename>", methods=["GET"])
 def static_files(filename: str):
-    safe = (SCRIPT_DIR / filename).resolve()
-    if SCRIPT_DIR not in safe.parents and safe != SCRIPT_DIR:
-        return jsonify({"ok": False, "error": "Forbidden"}), 403
+    if filename not in PUBLIC_FILES:
+        return jsonify({"ok": False, "error": "Not found"}), 404
     return send_from_directory(SCRIPT_DIR, filename)
 
 
