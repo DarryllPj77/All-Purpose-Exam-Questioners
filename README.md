@@ -107,6 +107,17 @@ POSTGRES_DSN=postgresql://apeq:apeq@localhost:5432/apeq
 python server.py
 ```
 
+## Running Tests
+
+```bash
+python -m unittest discover -s tests -t .
+node --test tests/js
+```
+
+The API tests use the database configured in `.env` and clean up the test
+users they create. See [docs/learning-platform.md](docs/learning-platform.md)
+for the learning-platform architecture, progress model and status.
+
 ## Environment Notes
 
 - Commit `.env.example`, not `.env`

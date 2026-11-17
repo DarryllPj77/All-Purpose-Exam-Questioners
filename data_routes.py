@@ -16,6 +16,7 @@ from psycopg2.extras import Json
 
 from auth import current_user_id, login_required
 from db import cursor, fetch_all, fetch_one, execute
+from question_ids import assign_question_ids
 
 bp = Blueprint("data", __name__)
 
@@ -156,6 +157,16 @@ def get_set(set_id: str):
     )
     if not row:
         return jsonify({"ok": False, "error": "Not found."}), 404
+
+    # Sets saved before question ids existed get them once, on first read.
+    # updated_at is left alone: the content did not change.
+    questions, changed = assign_question_ids(row.get("questions") or [])
+    if changed:
+        execute(
+            "UPDATE question_sets SET questions = %s WHERE id = %s AND owner_id = %s",
+            (Json(questions), set_id, uid),
+        )
+        row = {**row, "questions": questions}
     return jsonify({"ok": True, "set": _full_record(row)})
 
 
@@ -174,6 +185,7 @@ def upsert_set():
     questions = payload.get("questions") or []
     if not isinstance(questions, list) or not questions:
         return jsonify({"ok": False, "error": "questions must be a non-empty list."}), 400
+    questions, _ = assign_question_ids(questions)
 
     stats = payload.get("stats") or {
         "sessionsRun": 0,

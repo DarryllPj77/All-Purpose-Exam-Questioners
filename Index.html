@@ -255,7 +255,7 @@
                 <p>Manage your private question sets and select which one will be used in your next session.</p>
             </header>
             <p id="questionSetsStatus" class="qsets-status" role="status" aria-live="polite" style="display: none;"></p>
-            <div id="questionSetsList" class="qsets-list"></div>
+            <div id="questionSetsList" class="qsets-list"><div class="ui-state ui-state--loading" role="status"><span class="ui-spinner" aria-hidden="true"></span><span>Loading your question sets…</span></div></div>
         </section>
 
         <section class="card card--history" id="sessionHistory" style="display: block;">
@@ -266,7 +266,7 @@
                 </div>
                 <button type="button" class="btn btn--ghost btn--sm" id="clearHistoryBtn" onclick="clearSessionHistory()">Clear history</button>
             </header>
-            <div id="historyList"></div>
+            <div id="historyList"><div class="ui-state ui-state--loading" role="status"><span class="ui-spinner" aria-hidden="true"></span><span>Loading your history…</span></div></div>
             <div id="incompleteSessionNotice" class="incomplete-notice" style="display: none;">
                 <span class="incomplete-notice__dot" aria-hidden="true"></span>
                 <span>There's an unfinished session — pick up where you left off.</span>
@@ -429,7 +429,9 @@
         </section>
     </div>
 
+    <script src="js/core/learning.js"></script>
     <script src="questions.js"></script>
     <script src="Cert.js"></script>
+    <script src="js/shell.js"></script>
 </body>
 </html>

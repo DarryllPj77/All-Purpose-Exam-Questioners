@@ -762,10 +762,11 @@ async function submitAuth() {
 
 async function signOut() {
     await _authFetch('/api/auth/logout', { method: 'POST' });
+    // Discard while we still know whose session it is (the key is per user),
+    // and before reload so the beforeunload save cannot write it back.
+    discardSavedSession({ beforeReload: true });
     currentUser = null;
     QSetStore.reset();
-    // Reset the in-memory quiz state so nothing leaks into the next user.
-    try { localStorage.removeItem('examSessionData'); } catch (_) {}
     // Clean reload puts us back at the auth overlay, with a fresh page.
     window.location.reload();
 }
@@ -838,6 +839,9 @@ async function onSignedIn() {
             console.warn('[auth] active set hydrate failed:', e);
         }
     }
+
+    migrateLegacySavedSession();
+    try { loadFromStorage(); } catch (_) {}
 
     // Refresh dashboard widgets that read from server-cached data.
     try { renderQuestionSets(); } catch (_) {}
@@ -1017,7 +1021,7 @@ function startTrainingMode(unlimited) {
 
 function continueSession() {
     // Resume from saved session
-    const savedData = JSON.parse(localStorage.getItem('examSessionData') || '{}');
+    const savedData = readSavedSession();
     if (savedData && savedData.sessionActive) {
         currentQuestion = savedData.currentQuestion || 0;
         userAnswers = savedData.userAnswers || {};
@@ -1418,178 +1422,6 @@ function updateTimerDisplay() {
     }
 }
 
-// Modified submitExam to handle training mode feedback
-function submitExam() {
-    clearInterval(timerInterval);
-    calculateScore();
-
-    // Save session result to history
-    const correct = typeof lastScoreCorrectCount !== 'undefined' ? lastScoreCorrectCount : 0;
-    const total = typeof questions !== 'undefined' ? questions.length : 0;
-    const percentage = total ? Math.round((correct / total) * 100) : 0;
-    const mode = isTrainingMode ? 'Training' : 'Exam';
-    const now = new Date();
-    const dateStr = now.toLocaleString();
-    saveSessionHistory({
-        mode: mode,
-        score: percentage,
-        correct: correct,
-        total: total,
-        date: dateStr
-    });
-
-    // Roll the per-set stats forward so the Question sets card shows progress.
-    try {
-        const activeSetId = QSetStore.getActiveId();
-        if (activeSetId) QSetStore.updateStats(activeSetId, percentage);
-    } catch (_) { /* localStorage may be disabled */ }
-
-    if (isTrainingMode) {
-        showFullscreenFeedback();
-    } else {
-        showResults();
-    }
-
-    sessionActive = false;
-    saveToStorage();
-    renderSessionHistory();
-}
-
-function calculateScore() {
-    if (typeof questions === 'undefined') return;
-
-    let correctCount = 0;
-    const totalQuestions = questions.length;
-
-    questions.forEach((question, index) => {
-        if (isQuestionResponseCorrect(question, index)) correctCount++;
-    });
-
-    lastScoreCorrectCount = correctCount;
-
-    const percentage = Math.round((correctCount / totalQuestions) * 100);
-    const incorrectCount = totalQuestions - correctCount;
-    
-    // Update score display
-    const correctCountEl = document.getElementById('correctCount');
-    const incorrectCountEl = document.getElementById('incorrectCount');
-    const finalScoreEl = document.getElementById('finalScore');
-    const scorePercentageEl = document.getElementById('scorePercentage');
-    const totalQuestionsEl = document.getElementById('totalQuestionsCount');
-    const scoreTitleEl = document.getElementById('scoreTitle');
-    const resultSummaryEl = document.getElementById('resultSummaryText');
-    const resultHero = document.getElementById('resultHero');
-    const performance = getPerformanceCopy(percentage, correctCount, totalQuestions, 'exam');
-    
-    if (totalQuestionsEl) totalQuestionsEl.textContent = totalQuestions;
-    if (correctCountEl) correctCountEl.textContent = correctCount;
-    if (incorrectCountEl) incorrectCountEl.textContent = incorrectCount;
-    if (finalScoreEl) finalScoreEl.textContent = `${percentage}%`;
-    if (scoreTitleEl) scoreTitleEl.textContent = performance.title;
-    if (resultSummaryEl) resultSummaryEl.textContent = performance.summary;
-    if (resultHero) resultHero.dataset.tone = performance.tone;
-    if (scorePercentageEl) scorePercentageEl.innerHTML = buildScoreRingHtml(percentage, 'Overall score');
-
-    generateQuestionReview();
-}
-
-function generateQuestionReview() {
-    const reviewContainer = document.getElementById('questionReview');
-    if (!reviewContainer || typeof questions === 'undefined') return;
-
-    const correctCount = questions.reduce((count, question, index) => (
-        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
-    ), 0);
-    reviewContainer.innerHTML = questions.map(buildQuestionReviewCard).join('');
-
-    const allCount = document.getElementById('reviewAllCount');
-    const correctCountEl = document.getElementById('reviewCorrectCount');
-    const incorrectCountEl = document.getElementById('reviewIncorrectCount');
-    if (allCount) allCount.textContent = questions.length;
-    if (correctCountEl) correctCountEl.textContent = correctCount;
-    if (incorrectCountEl) incorrectCountEl.textContent = questions.length - correctCount;
-
-    const allButton = document.querySelector('[data-review-filter="all"]');
-    if (allButton) filterQuestionReview('all', allButton);
-}
-
-// New function for fullscreen training feedback
-function showFullscreenFeedback() {
-    const feedbackContent = document.getElementById('feedbackContent');
-    if (!feedbackContent || typeof questions === 'undefined') return;
-
-    const total = questions.length;
-    const correct = questions.reduce((count, question, index) => (
-        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
-    ), 0);
-    const percentage = total ? Math.round((correct / total) * 100) : 0;
-    const performance = getPerformanceCopy(percentage, correct, total, 'training');
-    const title = document.getElementById('trainingFeedbackTitle');
-    const summary = document.getElementById('trainingFeedbackSummary');
-    const score = document.getElementById('trainingFeedbackScore');
-
-    if (title) title.textContent = performance.title;
-    if (summary) summary.textContent = performance.summary;
-    if (score) score.innerHTML = buildScoreRingHtml(percentage, 'Training score');
-    feedbackContent.innerHTML = questions.map(buildQuestionReviewCard).join('');
-    
-    const fullscreenFeedback = document.getElementById('fullscreenFeedback');
-    if (fullscreenFeedback) {
-        fullscreenFeedback.style.display = 'block';
-        fullscreenFeedback.scrollTop = 0;
-        document.body.classList.add('training-results-open');
-    }
-}
-
-function closeFeedback() {
-    const fullscreenFeedback = document.getElementById('fullscreenFeedback');
-    if (fullscreenFeedback) {
-        fullscreenFeedback.style.display = 'none';
-        document.body.classList.remove('training-results-open');
-    }
-    backToDashboard();
-}
-
-function showResults() {
-    const examContent = document.getElementById('examContent');
-    const results = document.getElementById('results');
-    
-    if (examContent) examContent.style.display = 'none';
-    if (results) results.style.display = 'block';
-}
-
-function restartExam() {
-    // Reset all variables
-    currentQuestion = 0;
-    userAnswers = {};
-    timeLeft = 3600;
-    isTrainingMode = false;
-    isUnlimitedTime = false;
-    sessionActive = false;
-    
-    // Clear timer
-    if (timerInterval) {
-        clearInterval(timerInterval);
-    }
-    
-    // Reset timer display
-    const timerElement = document.getElementById('timer');
-    if (timerElement) {
-        timerElement.textContent = '60:00';
-        timerElement.style.color = '';
-    }
-    
-    // Hide results and show exam content
-    const results = document.getElementById('results');
-    const examContent = document.getElementById('examContent');
-    
-    if (results) results.style.display = 'none';
-    if (examContent) examContent.style.display = 'block';
-    
-    // Clear storage and reinitialize
-    clearStorage();
-    initializeExam();
-}
 
 // --- Session History (now PostgreSQL-backed, per signed-in user) ---
 //
@@ -1718,7 +1550,7 @@ function renderSessionHistory() {
 
     // Incomplete session notice — still per-device via localStorage.
     const incompleteNotice = document.getElementById('incompleteSessionNotice');
-    const sessionData = JSON.parse(localStorage.getItem('examSessionData') || '{}');
+    const sessionData = readSavedSession();
     if (incompleteNotice) {
         if (sessionData && sessionData.sessionActive) {
             incompleteNotice.style.display = 'block';
@@ -1914,9 +1746,8 @@ function normalizeAnswerList(answer) {
 }
 
 function isQuestionResponseCorrect(question, index) {
-    const submitted = normalizeAnswerList(userAnswers[index]).sort();
-    const expected = normalizeAnswerList(question.answer).sort();
-    return JSON.stringify(submitted) === JSON.stringify(expected);
+    // Same rule every study mode uses (js/core/learning.js).
+    return Quizer.learning.isCorrectAnswer(question, userAnswers[index]);
 }
 
 function getPerformanceCopy(percentage, correct, total, mode) {
@@ -2141,12 +1972,56 @@ function saveToStorage() {
         isUnlimitedTime: isUnlimitedTime,
         sessionActive: sessionActive // <-- ensure this is true while in progress
     };
-    localStorage.setItem('examSessionData', JSON.stringify(examData));
+    if (sessionSaveSuppressed) return;
+    const key = examSessionStorageKey();
+    if (!key) return; // signed out: never write a session nobody owns
+    try { localStorage.setItem(key, JSON.stringify(examData)); } catch (_) { /* storage disabled */ }
+}
+
+// ---- Saved-session storage -------------------------------------------------
+// The in-progress exam is stored per signed-in user ("examSessionData:u<id>"),
+// so a second account in the same browser never sees someone else's session.
+const LEGACY_SESSION_KEY = 'examSessionData';
+let sessionSaveSuppressed = false;
+
+function examSessionStorageKey() {
+    return Quizer.learning.examSessionKey(currentUser && currentUser.id);
+}
+
+function readSavedSession() {
+    const key = examSessionStorageKey();
+    if (!key) return {};
+    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (_) { return {}; }
+}
+
+// beforeReload: the page is about to reload, so stop the beforeunload save
+// from writing the in-memory session straight back.
+function discardSavedSession(options) {
+    const key = examSessionStorageKey();
+    try {
+        if (key) localStorage.removeItem(key);
+        localStorage.removeItem(LEGACY_SESSION_KEY);
+    } catch (_) { /* storage disabled */ }
+    if (options && options.beforeReload) sessionSaveSuppressed = true;
+}
+
+// Sessions saved before per-user keys existed: hand the one legacy session
+// to the account that signs in, once, then remove the shared key.
+function migrateLegacySavedSession() {
+    const key = examSessionStorageKey();
+    if (!key) return;
+    try {
+        const legacy = localStorage.getItem(LEGACY_SESSION_KEY);
+        if (legacy && !localStorage.getItem(key)) localStorage.setItem(key, legacy);
+        localStorage.removeItem(LEGACY_SESSION_KEY);
+    } catch (_) { /* storage disabled */ }
 }
 
 // Modified loadFromStorage to check for existing session
 function loadFromStorage() {
-    const savedData = localStorage.getItem('examSessionData');
+    const key = examSessionStorageKey();
+    let savedData = null;
+    try { savedData = key ? localStorage.getItem(key) : null; } catch (_) { savedData = null; }
     if (savedData) {
         try {
             const sessionData = JSON.parse(savedData);
@@ -2166,8 +2041,8 @@ function loadFromStorage() {
 }
 
 function clearStorage() {
-    localStorage.removeItem('examSessionData');
-    localStorage.removeItem('pythonExamData'); // Clean up old storage key
+    discardSavedSession();
+    try { localStorage.removeItem('pythonExamData'); } catch (_) {} // Clean up old storage key
 }
 
 // Initialize on load
@@ -2177,7 +2052,8 @@ window.addEventListener('load', function() {
     if (totalQuestionsEl && typeof questions !== 'undefined') {
         totalQuestionsEl.textContent = questions.length;
     }
-    renderSessionHistory();
+    // Before sign-in finishes there is no history to show yet; onSignedIn renders it.
+    if (currentUser) renderSessionHistory();
 });
 
 // Save when leaving
@@ -2569,7 +2445,7 @@ async function uploadPdf() {
         const finalJob = await pollGenerationStatus(data.jobId);
         stopElapsedTimer();
         setUploadStatus(finalJob.message || 'Questions generated. Reloading…', 'success');
-        try { localStorage.removeItem('examSessionData'); } catch (_) {}
+        discardSavedSession({ beforeReload: true });
         setTimeout(() => window.location.reload(), 1100);
     } catch (err) {
         stopElapsedTimer();
@@ -2768,7 +2644,7 @@ async function activateQuestionSet(id, button) {
         }
 
         // The new question bank cannot safely resume an old in-progress session.
-        try { localStorage.removeItem('examSessionData'); } catch (_) {}
+        discardSavedSession();
         currentQuestion = 0;
         userAnswers = {};
         sessionActive = false;
@@ -2804,7 +2680,7 @@ function deleteQuestionSet(id) {
     if (wasActive) {
         // Drop the in-flight session and reload — the next active source becomes
         // whatever questions.js holds on disk (the last generation, or the demo bank).
-        try { localStorage.removeItem('examSessionData'); } catch (_) {}
+        discardSavedSession({ beforeReload: true });
         window.location.reload();
     }
 }
@@ -2873,210 +2749,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('drop', (e) => e.preventDefault());
 });
 
-
-/* ============================================================
-   App shell: sidebar navigation, header title, question navigator.
-   Wraps the existing functions (each wrapper calls the original
-   first), so answer selection, scoring and saving are unchanged.
-   ============================================================ */
-
-function isExamVisible() {
-    const exam = document.getElementById('examContainer');
-    return !!exam && exam.style.display !== 'none';
-}
-
-function isResultsVisible() {
-    const results = document.getElementById('results');
-    return !!results && results.style.display !== 'none' && isExamVisible();
-}
-
-function activeQuestionSetTitle() {
-    try {
-        const id = QSetStore.getActiveId();
-        const summary = id ? QSetStore.list().find((set) => set.id === id) : null;
-        if (summary && summary.title) return summary.title;
-    } catch (_) { /* store not ready */ }
-    return 'Default question set';
-}
-
-// ---- Header title follows the current screen ---------------------------
-function syncAppBar() {
-    const eyebrow = document.getElementById('appBarEyebrow');
-    const title = document.getElementById('appBarTitle');
-    if (!eyebrow || !title) return;
-    if (isResultsVisible()) {
-        eyebrow.textContent = isTrainingMode ? 'Training results' : 'Exam results';
-        title.textContent = activeQuestionSetTitle();
-    } else if (isExamVisible()) {
-        eyebrow.textContent = isTrainingMode ? 'Training session' : 'Exam session';
-        title.textContent = activeQuestionSetTitle();
-    } else {
-        eyebrow.textContent = 'Workspace';
-        title.textContent = 'Dashboard';
-    }
-    const setTitle = document.getElementById('quizSetTitle');
-    if (setTitle) setTitle.textContent = activeQuestionSetTitle();
-    document.body.classList.toggle('is-quiz', isExamVisible() && !isResultsVisible());
-}
-
-// ---- Question navigator -----------------------------------------------
-function isQuestionAnswered(index) {
-    const answer = userAnswers[index];
-    return Array.isArray(answer) ? answer.length > 0 : !!answer;
-}
-
-function renderQuestionNavigator() {
-    const nav = document.getElementById('questionNav');
-    if (!nav || typeof questions === 'undefined') return;
-    nav.setAttribute('role', 'group');
-    const total = questions.length;
-    let answered = 0;
-    const fragment = document.createDocumentFragment();
-    for (let i = 0; i < total; i++) {
-        const isAnswered = isQuestionAnswered(i);
-        const isCurrent = i === currentQuestion;
-        if (isAnswered) answered++;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'qn-btn' +
-            (isAnswered ? ' qn-btn--answered' : '') +
-            (isCurrent ? ' qn-btn--current' : '');
-        button.textContent = String(i + 1);
-        button.setAttribute('aria-label',
-            `Question ${i + 1}, ${isAnswered ? 'answered' : 'not answered'}${isCurrent ? ', current' : ''}`);
-        if (isCurrent) button.setAttribute('aria-current', 'step');
-        button.addEventListener('click', () => goToQuestion(i));
-        fragment.appendChild(button);
-    }
-    nav.replaceChildren(fragment);
-
-    const count = document.getElementById('navigatorCount');
-    if (count) count.textContent = `${Math.min(currentQuestion + 1, total)} / ${total}`;
-    const summary = document.getElementById('navigatorSummary');
-    if (summary) {
-        const left = total - answered;
-        summary.textContent = left
-            ? `${answered} of ${total} answered · ${left} left`
-            : `All ${total} questions answered`;
-    }
-}
-
-function goToQuestion(index) {
-    if (typeof questions === 'undefined' || index < 0 || index >= questions.length) return;
-    currentQuestion = index;
-    displayQuestion();
-    updateProgress();
-    saveToStorage();
-    const card = document.querySelector('.question-card');
-    if (card && window.matchMedia('(max-width: 1100px)').matches) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-}
-
-// Submitting from the panel can happen before the last question, so it
-// confirms when questions are still unanswered, then runs the normal submit.
-function submitFromNavigator() {
-    if (typeof questions === 'undefined') return;
-    let unanswered = 0;
-    for (let i = 0; i < questions.length; i++) if (!isQuestionAnswered(i)) unanswered++;
-    if (unanswered > 0) {
-        const ok = window.confirm(
-            `${unanswered} question${unanswered === 1 ? ' is' : 's are'} still unanswered and will be marked incorrect. Submit anyway?`);
-        if (!ok) return;
-    }
-    submitExam();
-}
-
-// ---- Sidebar ----------------------------------------------------------
-function toggleSidebar(force) {
-    const sidebar = document.getElementById('appSidebar');
-    const scrim = document.getElementById('sidebarScrim');
-    const toggle = document.getElementById('sidebarToggle');
-    if (!sidebar) return;
-    const open = typeof force === 'boolean' ? force : !sidebar.classList.contains('is-open');
-    sidebar.classList.toggle('is-open', open);
-    document.body.classList.toggle('sidebar-open', open);
-    if (scrim) scrim.hidden = !open;
-    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-        const first = sidebar.querySelector('.side-nav__link');
-        if (first) first.focus();
-    } else if (toggle && sidebar.contains(document.activeElement)) {
-        toggle.focus();
-    }
-}
-
-function setActiveNav(target) {
-    document.querySelectorAll('.side-nav__link[data-nav-target]').forEach((link) => {
-        const active = link.dataset.navTarget === target;
-        link.classList.toggle('is-active', active);
-        if (active) link.setAttribute('aria-current', 'true');
-        else link.removeAttribute('aria-current');
-    });
-}
-
-function navigateToSection(target) {
-    // Leaving a live session keeps it resumable (same as "Save and exit").
-    if (isExamVisible()) backToDashboard();
-    const feedback = document.getElementById('fullscreenFeedback');
-    if (feedback && feedback.style.display !== 'none') closeFeedback();
-    setActiveNav(target);
-    toggleSidebar(false);
-    const el = document.getElementById(target);
-    if (!el) return;
-    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-    if (target === 'dashboard') window.scrollTo({ top: 0, behavior });
-    else el.scrollIntoView({ behavior, block: 'start' });
-}
-
-function watchSectionsForNav() {
-    if (!('IntersectionObserver' in window)) return;
-    const ids = ['studyCard', 'generateCard', 'importCard', 'questionSetsSection', 'sessionHistory'];
-    const visible = new Map();
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0));
-        if (isExamVisible()) return;
-        if (window.scrollY < 80) { setActiveNav('dashboard'); return; }
-        let best = null; let bestRatio = 0;
-        ids.forEach((id) => { const r = visible.get(id) || 0; if (r > bestRatio) { best = id; bestRatio = r; } });
-        if (best) setActiveNav(best);
-    }, { threshold: [0, 0.25, 0.5, 0.75], rootMargin: '-70px 0px -35% 0px' });
-    ids.forEach((id) => { const el = document.getElementById(id); if (el) observer.observe(el); });
-}
-
-// ---- Wrap existing screen changes ---------------------------------------
-(function wrapScreenChanges() {
-    const wrap = (name, after) => {
-        const original = window[name];
-        if (typeof original !== 'function') return;
-        window[name] = function () {
-            const result = original.apply(this, arguments);
-            after();
-            return result;
-        };
-    };
-    const refreshQuiz = () => { renderQuestionNavigator(); syncAppBar(); setActiveNav('studyCard'); };
-    wrap('displayQuestion', refreshQuiz);
-    wrap('selectAnswer', renderQuestionNavigator);
-    wrap('showResults', () => { syncAppBar(); setActiveNav('studyCard'); window.scrollTo({ top: 0 }); });
-    wrap('backToDashboard', () => { syncAppBar(); setActiveNav('dashboard'); });
-    wrap('showFullscreenFeedback', syncAppBar);
-    wrap('closeFeedback', syncAppBar);
-})();
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.side-nav__link[data-nav-target]').forEach((link) => {
-        link.addEventListener('click', (event) => {
-            event.preventDefault();
-            navigateToSection(link.dataset.navTarget);
-        });
-    });
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) toggleSidebar(false);
-    });
-    window.matchMedia('(min-width: 1025px)').addEventListener('change', (mq) => {
-        if (mq.matches) toggleSidebar(false);
-    });
-    watchSectionsForNav();
-    syncAppBar();
-});

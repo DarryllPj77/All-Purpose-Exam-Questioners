@@ -2,7 +2,7 @@
 
 Routes:
   GET  /                               → serves Index.html
-  GET  /<file>                         → serves Cert.css, Cert.js, questions.js only
+  GET  /<file>                         → serves only the files in PUBLIC_FILES
 
   POST /api/auth/register              → create account + sign in
   POST /api/auth/login                 → sign in
@@ -18,6 +18,11 @@ Routes:
   GET/POST/DELETE /api/history         → session history (per user)
   GET  /api/history/<id>               → one session's exam review details
   GET/PUT/DELETE /api/active-session   → in-progress session state
+
+  GET  /api/learning/config            → mastery and review rules
+  GET  /api/progress/<setId>           → per-question learning progress
+  GET/POST /api/progress/<setId>/attempts → answer history (append-only)
+  GET/PUT/DELETE /api/study-sessions/<setId>/<mode> → resumable mode state
 
   POST /api/analyze                    → PDF analysis (login required)
   POST /api/generate                   → submit generation job (login required)
@@ -54,6 +59,7 @@ from backend import DEFAULT_OUTPUT, SCRIPT_DIR, analyze, generate
 from billing import increment_usage, plan_limits, usage_summary
 from auth import bp as auth_bp, current_user_id, login_required
 from data_routes import bp as data_bp, _new_set_id
+from progress_routes import bp as progress_bp
 from db import cursor, execute, fetch_one, init_schema
 
 # Load .env before reading any env var.
@@ -78,6 +84,7 @@ except Exception as e:  # noqa: BLE001 — surface early on misconfig
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(data_bp)
+app.register_blueprint(progress_bp)
 
 
 @app.after_request
@@ -101,7 +108,10 @@ def index():
 # Only the files the page itself loads are public. Everything else in the
 # project folder (.env, *.py, schema.sql, .git/, uploaded PDFs, logs) must
 # never be served, so this is an allow-list, not a path check.
-PUBLIC_FILES = frozenset({"Index.html", "Cert.css", "Cert.js", "questions.js"})
+PUBLIC_FILES = frozenset({
+    "Index.html", "Cert.css", "Cert.js", "questions.js",
+    "js/core/learning.js", "js/shell.js",
+})
 
 
 @app.route("/<path:filename>", methods=["GET"])

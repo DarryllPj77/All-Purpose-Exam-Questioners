@@ -3421,3 +3421,42 @@ body { padding: 0; }
 /* Section jumps land below the sticky header */
 #studyCard, #generateCard, #importCard, #questionSetsSection, #sessionHistory { scroll-margin-top: calc(var(--header-h) + var(--s-5)); }
 .sidebar .brand__name { display: inline; }
+
+/* ============================================================
+   State components: loading, empty and error, one look everywhere.
+   <div class="ui-state ui-state--loading|empty|error" role="status">
+   ============================================================ */
+.ui-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-3);
+    padding: var(--s-6) var(--s-5);
+    border: 1px dashed var(--c-border-strong);
+    border-radius: var(--r-lg);
+    background: var(--c-surface-3);
+    color: var(--c-text-muted);
+    font-size: 14px;
+    text-align: center;
+}
+.ui-state--error {
+    border-style: solid;
+    border-color: rgba(236, 154, 151, 0.35);
+    background: var(--c-danger-soft);
+    color: var(--c-danger-ink);
+}
+.card--history #historyList > .ui-state { background: var(--c-surface-3); border-color: var(--c-border-strong); }
+.card--history #historyList > .ui-state:hover { transform: none; box-shadow: none; }
+.ui-spinner {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--c-border-strong);
+    border-top-color: var(--c-primary);
+    animation: spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+    /* A frozen spinner reads as broken; show a steady dot instead. */
+    .ui-spinner { animation: none; border-color: var(--c-primary); }
+}
