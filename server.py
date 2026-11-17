@@ -16,6 +16,7 @@ Routes:
   POST   /api/sets/<id>/stats          → record a practice score
   GET/PUT /api/active-set              → which set powers the quiz
   GET/POST/DELETE /api/history         → session history (per user)
+  GET  /api/history/<id>               → one session's exam review details
   GET/PUT/DELETE /api/active-session   → in-progress session state
 
   POST /api/analyze                    → PDF analysis (login required)

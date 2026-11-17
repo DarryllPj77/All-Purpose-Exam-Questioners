@@ -21,6 +21,79 @@ bp = Blueprint("data", __name__)
 
 QSET_ID_RE = re.compile(r"^qs_[A-Za-z0-9_-]{1,64}$")
 MAX_SETS_PER_USER = 200
+MAX_HISTORY_REVIEW_QUESTIONS = 500
+MAX_HISTORY_REVIEW_BYTES = 2_000_000
+
+
+def _normalize_history_review(value: Any, expected_total: int) -> dict[str, Any] | None:
+    """Validate and trim the client review snapshot before storing it."""
+    if value is None:
+        return None
+    if not isinstance(value, dict) or not isinstance(value.get("questions"), list):
+        raise ValueError("review must contain a questions array.")
+
+    raw_questions = value["questions"]
+    if len(raw_questions) != expected_total:
+        raise ValueError("review question count must match total.")
+    if len(raw_questions) > MAX_HISTORY_REVIEW_QUESTIONS:
+        raise ValueError(f"review cannot exceed {MAX_HISTORY_REVIEW_QUESTIONS} questions.")
+
+    normalized_questions: list[dict[str, Any]] = []
+    for index, raw_question in enumerate(raw_questions):
+        if not isinstance(raw_question, dict):
+            raise ValueError(f"review question {index + 1} must be an object.")
+
+        text = raw_question.get("text")
+        choices = raw_question.get("choices")
+        correct_answer = raw_question.get("answer")
+        user_answer = raw_question.get("userAnswer")
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError(f"review question {index + 1} needs text.")
+        if not isinstance(choices, dict) or not 2 <= len(choices) <= 20:
+            raise ValueError(f"review question {index + 1} needs 2 to 20 choices.")
+
+        clean_choices: dict[str, str] = {}
+        for raw_key, raw_choice in choices.items():
+            key = str(raw_key).strip()[:20]
+            if not key or not isinstance(raw_choice, str):
+                raise ValueError(f"review question {index + 1} contains an invalid choice.")
+            clean_choices[key] = raw_choice[:10_000]
+
+        def clean_answers(raw_answers: Any, label: str) -> list[str]:
+            if not isinstance(raw_answers, list):
+                raise ValueError(f"review question {index + 1} {label} must be an array.")
+            answers = [str(answer).strip()[:20] for answer in raw_answers]
+            if any(not answer or answer not in clean_choices for answer in answers):
+                raise ValueError(f"review question {index + 1} {label} contains an unknown choice.")
+            return list(dict.fromkeys(answers))
+
+        clean_correct = clean_answers(correct_answer, "answer")
+        clean_user = clean_answers(user_answer, "userAnswer")
+        if not clean_correct:
+            raise ValueError(f"review question {index + 1} needs a correct answer.")
+
+        raw_descriptions = raw_question.get("answerDescriptions")
+        clean_descriptions: dict[str, str] = {}
+        if isinstance(raw_descriptions, dict):
+            for raw_key, raw_description in raw_descriptions.items():
+                key = str(raw_key).strip()[:20]
+                if key in clean_choices and isinstance(raw_description, str) and raw_description.strip():
+                    clean_descriptions[key] = raw_description[:20_000]
+
+        normalized_questions.append({
+            "number": index + 1,
+            "text": text[:20_000],
+            "choices": clean_choices,
+            "answer": clean_correct,
+            "userAnswer": clean_user,
+            "answerDescriptions": clean_descriptions,
+        })
+
+    normalized = {"version": 1, "questions": normalized_questions}
+    encoded_size = len(json.dumps(normalized, ensure_ascii=False).encode("utf-8"))
+    if encoded_size > MAX_HISTORY_REVIEW_BYTES:
+        raise ValueError("review details are too large to save.")
+    return normalized
 
 
 # ============================================================
@@ -255,9 +328,16 @@ def put_active_set():
 def list_history():
     uid = current_user_id()
     rows = fetch_all(
-        "SELECT id, set_id, mode, score, correct_count, total_count, finished_at "
-        "FROM session_history WHERE owner_id = %s "
-        "ORDER BY finished_at DESC LIMIT 100",
+        "SELECT history.id, history.set_id, "
+        "       COALESCE(history.set_title, sets.title) AS set_title, "
+        "       history.mode, history.score, history.correct_count, "
+        "       history.total_count, history.finished_at, "
+        "       (history.review_data IS NOT NULL) AS has_details "
+        "FROM session_history AS history "
+        "LEFT JOIN question_sets AS sets "
+        "  ON sets.id = history.set_id AND sets.owner_id = history.owner_id "
+        "WHERE history.owner_id = %s "
+        "ORDER BY history.finished_at DESC LIMIT 100",
         (uid,),
     )
     return jsonify({
@@ -266,11 +346,13 @@ def list_history():
             {
                 "id": r["id"],
                 "setId": r["set_id"],
+                "setTitle": r["set_title"],
                 "mode": r["mode"],
                 "score": r["score"],
                 "correct": r["correct_count"],
                 "total": r["total_count"],
                 "date": r["finished_at"].isoformat() if r["finished_at"] else None,
+                "hasDetails": bool(r["has_details"]),
             }
             for r in rows
         ],
@@ -294,17 +376,76 @@ def append_history():
     if set_id is not None and not QSET_ID_RE.match(set_id):
         return jsonify({"ok": False, "error": "Bad set id."}), 400
 
+    set_title = None
+    if set_id is not None:
+        owned_set = fetch_one(
+            "SELECT title FROM question_sets WHERE id = %s AND owner_id = %s",
+            (set_id, uid),
+        )
+        if not owned_set:
+            return jsonify({"ok": False, "error": "Set does not belong to this user."}), 403
+        set_title = owned_set["title"]
+    else:
+        raw_title = payload.get("setTitle")
+        supplied_title = raw_title.strip() if isinstance(raw_title, str) else "Default question set"
+        set_title = supplied_title[:200] or "Default question set"
+
+    score_int = int(score)
+    correct_int = int(correct)
+    total_int = int(total)
+    if not 0 <= score_int <= 100 or total_int < 0 or not 0 <= correct_int <= total_int:
+        return jsonify({"ok": False, "error": "Invalid score totals."}), 400
+
+    try:
+        review = _normalize_history_review(payload.get("review"), total_int)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
     row = fetch_one(
-        "INSERT INTO session_history (owner_id, set_id, mode, score, correct_count, total_count) "
-        "VALUES (%s, %s, %s, %s, %s, %s) "
+        "INSERT INTO session_history "
+        "(owner_id, set_id, set_title, mode, score, correct_count, total_count, review_data) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
         "RETURNING id, finished_at",
-        (uid, set_id, mode, int(score), int(correct), int(total)),
+        (uid, set_id, set_title, mode, score_int, correct_int, total_int,
+         Json(review) if review is not None else None),
     )
     return jsonify({
         "ok": True,
         "entry": {
             "id": row["id"],
+            "setId": set_id,
+            "setTitle": set_title,
             "date": row["finished_at"].isoformat(),
+            "hasDetails": review is not None,
+        },
+    })
+
+
+@bp.route("/api/history/<int:history_id>", methods=["GET"])
+@login_required
+def get_history_details(history_id: int):
+    uid = current_user_id()
+    row = fetch_one(
+        "SELECT id, set_id, set_title, mode, score, correct_count, total_count, "
+        "       finished_at, review_data "
+        "FROM session_history WHERE id = %s AND owner_id = %s",
+        (history_id, uid),
+    )
+    if not row:
+        return jsonify({"ok": False, "error": "Session history entry not found."}), 404
+
+    return jsonify({
+        "ok": True,
+        "entry": {
+            "id": row["id"],
+            "setId": row["set_id"],
+            "setTitle": row["set_title"],
+            "mode": row["mode"],
+            "score": row["score"],
+            "correct": row["correct_count"],
+            "total": row["total_count"],
+            "date": row["finished_at"].isoformat() if row["finished_at"] else None,
+            "review": row["review_data"],
         },
     })
 

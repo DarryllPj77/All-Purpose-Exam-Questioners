@@ -1,0 +1,26 @@
+cd "E:\Darryll pogi\FEU files Darryll\File for 2nd Year 3rd Sem\ADET Lec\xampp\htdocs\All Purpose Exam Questioners"
+
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+Copy-Item .env.example .env
+# then edit .env and set:
+# OPENROUTER_API_KEY
+# POSTGRES_DSN
+# FLASK_SECRET_KEY
+
+python server.py
+
+Then open:
+http://127.0.0.1:5000/
+
+Important
+The app expects a PostgreSQL database and a valid DSN in .env.example
+The app also needs a valid OpenRouter API key to generate questions
+If the virtual environment is already active, you can skip the activation step
+If you want the shortest version
+
+cd "E:\Darryll pogi\FEU files Darryll\File for 2nd Year 3rd Sem\ADET Lec\xampp\htdocs\All Purpose Exam Questioners"
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python server.py

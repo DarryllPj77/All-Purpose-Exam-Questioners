@@ -54,6 +54,7 @@ const QSetStore = (function () {
     const cache = {
         summaries: [],          // [{ id, title, ... }]
         fullRecords: new Map(), // id → full record (lazy-loaded)
+        pendingSaves: new Map(),// id → in-flight save request
         activeId: null,
         ready: false,
     };
@@ -98,6 +99,7 @@ const QSetStore = (function () {
     function reset() {
         cache.summaries = [];
         cache.fullRecords.clear();
+        cache.pendingSaves.clear();
         cache.activeId = null;
         cache.ready = false;
     }
@@ -152,7 +154,7 @@ const QSetStore = (function () {
 
         _upsertSummaryFromRecord(record);
 
-        fetchJSON('/api/sets', {
+        const saveRequest = fetchJSON('/api/sets', {
             method: 'POST',
             body: JSON.stringify({
                 id: record.id,
@@ -169,6 +171,15 @@ const QSetStore = (function () {
             }
         }).catch((e) => console.warn('[QSetStore] save network error:', e));
 
+        // Activation may happen immediately after an import. Keep the request so
+        // setActiveId can wait until the new set exists on the server.
+        cache.pendingSaves.set(record.id, saveRequest);
+        saveRequest.finally(() => {
+            if (cache.pendingSaves.get(record.id) === saveRequest) {
+                cache.pendingSaves.delete(record.id);
+            }
+        });
+
         return record;
     }
 
@@ -184,12 +195,39 @@ const QSetStore = (function () {
     function getActiveId() {
         return cache.activeId || null;
     }
-    function setActiveId(id) {
-        cache.activeId = id || null;
-        fetchJSON('/api/active-set', {
-            method: 'PUT',
-            body: JSON.stringify({ activeId: id || null }),
-        }).catch((e) => console.warn('[QSetStore] setActive network error:', e));
+    async function setActiveId(id) {
+        const nextId = id || null;
+        const previousId = cache.activeId;
+        cache.activeId = nextId;
+
+        try {
+            // A newly imported set is cached before its POST finishes. Waiting
+            // here prevents the active-set PUT from racing ahead of that POST.
+            const pendingSave = nextId ? cache.pendingSaves.get(nextId) : null;
+            if (pendingSave) await pendingSave;
+
+            const res = await fetchJSON('/api/active-set', {
+                method: 'PUT',
+                body: JSON.stringify({ activeId: nextId }),
+            });
+            if (!res.ok) {
+                const message = res.data && res.data.error
+                    ? res.data.error
+                    : 'The server could not activate this question set.';
+                throw new Error(message);
+            }
+
+            cache.activeId = res.data && Object.prototype.hasOwnProperty.call(res.data, 'activeId')
+                ? (res.data.activeId || null)
+                : nextId;
+            return cache.activeId === nextId;
+        } catch (e) {
+            // Do not leave the UI claiming that a set is active if persistence
+            // failed; the previous server-backed selection remains authoritative.
+            if (cache.activeId === nextId) cache.activeId = previousId;
+            console.warn('[QSetStore] setActive failed:', e);
+            return false;
+        }
     }
 
     function updateStats(id, finalScorePct) {
@@ -230,65 +268,137 @@ const QSetStore = (function () {
     };
 })();
 
-const AI_PROMPT_TEMPLATE = [
-    'Generate a multiple-choice question set based on the text/topic I provide below.',
-    'Return ONLY a raw JavaScript array (no `const`, no comments outside the array, no markdown fences) matching this exact shape.',
-    '',
-    'Example of the required output format:',
-    '[',
-    '  {',
-    '    number: 1,',
-    '    // Topic/Subtopic: XML Fundamentals',
-    '    text: `Which term is used to describe the first line of an XML document?`,',
-    '    choices: {',
-    '      A: `opening`,',
-    '      B: `prologue`,',
-    '      C: `introduction`,',
-    '      D: `preamble`,',
-    '    },',
-    '    answer: ["B"],',
-    '    maxSelections: 1',
-    '  },',
-    '  {',
-    '    number: 2,',
-    '    // Topic/Subtopic: Git File States',
-    '    text: `What are the three states of a Git file? (Choose three.)`,',
-    '    choices: {',
-    '      A: `staged`,',
-    '      B: `modified`,',
-    '      C: `locked`,',
-    '      D: `committed`,',
-    '      E: `deleted`,',
-    '      F: `secured`,',
-    '    },',
-    '    answer: ["A", "B", "D"],',
-    '    maxSelections: 3',
-    '  }',
-    ']',
-    '',
-    'Rules:',
-    '- Multiple-choice ONLY. Use distinct choices labelled A, B, C, D (and E, F if needed).',
-    '- `answer` must be an array of choice letters, e.g., ["B"] or ["A", "B", "D"].',
-    '- `maxSelections` must equal the number of correct answers required.',
-    '- Use backticks (`) around all string values for `text` and `choices` exactly as shown.',
-    '- Each question must be DISTINCT in topic and wording.',
-    '- Number questions sequentially starting at 1.',
-    '',
-    'Here is the topic/text:'
-].join('\n');
+const PROMPT_QUESTION_TYPE_CONFIG = Object.freeze({
+    single: {
+        responseType: 'single',
+        copyLabel: 'Copy Single-Answer AI Prompt',
+        hint: 'The copied prompt will require exactly one correct answer per question.',
+        instruction: 'Every question must have exactly ONE correct answer.',
+        text: 'Which term is used to describe the first line of an XML document?',
+        choices: ['opening', 'prologue', 'introduction', 'preamble'],
+        answers: ['B'],
+        descriptions: {
+            B: 'The XML declaration appears at the beginning of a document and is commonly called the XML prologue.'
+        }
+    },
+    'multiple-response': {
+        responseType: 'multiple-response',
+        copyLabel: 'Copy Multiple-Response AI Prompt',
+        hint: 'The copied prompt will create select-all-that-apply questions with two or more correct choices.',
+        instruction: 'Every question must be a MULTIPLE-RESPONSE question with at least TWO correct answers. Use wording such as "Select all that apply."',
+        text: 'Which items are valid Git file states? (Select all that apply.)',
+        choices: ['staged', 'modified', 'locked', 'committed'],
+        answers: ['A', 'B', 'D'],
+        descriptions: {
+            A: 'A staged file has changes placed in the index and ready for the next commit.',
+            B: 'A modified file has changes in the working tree that differ from the committed version.',
+            D: 'A committed file has its current version safely stored in the local repository.'
+        }
+    },
+    'multiple-select': {
+        responseType: 'multiple-select',
+        copyLabel: 'Copy Multiple-Select AI Prompt',
+        hint: 'The copied prompt will state an exact number of choices the learner must select.',
+        instruction: 'Every question must be a MULTIPLE-SELECT question with at least TWO correct answers. State the exact required count in the question, such as "Choose exactly two."',
+        text: 'Which two HTTP methods are normally used to create or replace a resource? (Choose exactly two.)',
+        choices: ['POST', 'GET', 'PUT', 'TRACE'],
+        answers: ['A', 'C'],
+        descriptions: {
+            A: 'POST commonly submits a representation that creates a new subordinate resource.',
+            C: 'PUT commonly creates or fully replaces the resource at the target URI.'
+        }
+    }
+});
+
+let selectedPromptQuestionType = 'single';
+
+function getPromptQuestionTypeConfig(type) {
+    return PROMPT_QUESTION_TYPE_CONFIG[type] || PROMPT_QUESTION_TYPE_CONFIG.single;
+}
+
+function buildAiPromptTemplate(type) {
+    const config = getPromptQuestionTypeConfig(type);
+    const choiceLines = config.choices.map((choice, index) => {
+        const key = String.fromCharCode(65 + index);
+        return `      ${key}: \`${choice}\`${index === config.choices.length - 1 ? '' : ','}`;
+    });
+    const descriptionLines = config.answers.map((key, index) => (
+        `      ${key}: \`${config.descriptions[key]}\`${index === config.answers.length - 1 ? '' : ','}`
+    ));
+
+    return [
+        'Generate a multiple-choice question set based on the text/topic I provide below.',
+        config.instruction,
+        'Return ONLY a raw JavaScript array (no `const`, no comments outside the array, no markdown fences) matching this exact shape.',
+        '',
+        'Example of the required output format:',
+        '[',
+        '  {',
+        '    number: 1,',
+        '    // Topic/Subtopic: Example topic',
+        `    text: \`${config.text}\`,`,
+        '    choices: {',
+        ...choiceLines,
+        '    },',
+        `    answer: ${JSON.stringify(config.answers)},`,
+        '    answerDescriptions: {',
+        ...descriptionLines,
+        '    },',
+        `    responseType: \`${config.responseType}\`,`,
+        `    maxSelections: ${config.answers.length}`,
+        '  }',
+        ']',
+        '',
+        'Rules:',
+        '- Use distinct choices labelled A, B, C, D (and E, F if needed).',
+        `- ${config.instruction}`,
+        '- `answer` must be an array containing every correct choice letter.',
+        '- `answerDescriptions` must contain one clear explanation for EACH letter in `answer`, and no entries for incorrect choices.',
+        '- Each answer description must explain why that specific choice is correct, not merely repeat the choice text.',
+        `- Set \`responseType\` to \`${config.responseType}\` for every question.`,
+        '- `maxSelections` must exactly equal the number of letters in `answer`.',
+        '- Use backticks (`) around all string values for `text`, `choices`, `answerDescriptions`, and `responseType` exactly as shown.',
+        '- Each question must be DISTINCT in topic and wording.',
+        '- Number questions sequentially starting at 1.',
+        '',
+        'Here is the topic/text:'
+    ].join('\n');
+}
+
+// Backwards-compatible default for older callers; copyPromptTemplate builds
+// the currently selected variant at click time.
+const AI_PROMPT_TEMPLATE = buildAiPromptTemplate('single');
+
+function selectPromptQuestionType(type) {
+    if (!PROMPT_QUESTION_TYPE_CONFIG[type]) return;
+    selectedPromptQuestionType = type;
+
+    document.querySelectorAll('[data-prompt-type]').forEach((button) => {
+        const selected = button.dataset.promptType === type;
+        button.classList.toggle('is-selected', selected);
+        button.setAttribute('aria-checked', selected ? 'true' : 'false');
+    });
+
+    const config = getPromptQuestionTypeConfig(type);
+    const hint = document.getElementById('promptTypeHint');
+    const copyButton = document.getElementById('copyPromptTemplateBtn');
+    if (hint) hint.textContent = config.hint;
+    if (copyButton) copyButton.textContent = config.copyLabel;
+}
 
 let copyPromptResetTimer;
 
 async function copyPromptTemplate() {
     const button = document.getElementById('copyPromptTemplateBtn');
+    const promptTemplate = buildAiPromptTemplate(selectedPromptQuestionType);
 
     try {
         if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
+            await navigator.clipboard.writeText(promptTemplate);
         } else {
             // Fallback for non-secure pages and older browsers.
             const temporaryTextarea = document.createElement('textarea');
-            temporaryTextarea.value = AI_PROMPT_TEMPLATE;
+            temporaryTextarea.value = promptTemplate;
             temporaryTextarea.setAttribute('readonly', '');
             temporaryTextarea.style.position = 'fixed';
             temporaryTextarea.style.left = '-9999px';
@@ -308,7 +418,7 @@ async function copyPromptTemplate() {
             clearTimeout(copyPromptResetTimer);
             button.textContent = 'Copied!';
             copyPromptResetTimer = setTimeout(() => {
-                button.textContent = 'Copy AI Prompt Template';
+                button.textContent = getPromptQuestionTypeConfig(selectedPromptQuestionType).copyLabel;
             }, 2000);
         }
     } catch (error) {
@@ -392,6 +502,87 @@ function formatManualImportParseError(error, originalSource) {
     return `Could not parse the pasted array: ${parserMessage}. Check for a missing comma, quote, or unmatched backtick.`;
 }
 
+function normalizeImportedQuestion(question, index) {
+    const label = `Question ${index + 1}`;
+    if (!question || typeof question !== 'object' || Array.isArray(question)) {
+        throw new Error(`${label} must be a question object.`);
+    }
+    if (typeof question.text !== 'string' || !question.text.trim()) {
+        throw new Error(`${label} must contain non-empty question text.`);
+    }
+    if (!question.choices || typeof question.choices !== 'object' || Array.isArray(question.choices)) {
+        throw new Error(`${label} must contain a choices object.`);
+    }
+
+    const choices = Object.assign({}, question.choices);
+    const choiceKeys = Object.keys(choices);
+    if (choiceKeys.length < 2 || choiceKeys.some(key => typeof choices[key] !== 'string' || !choices[key].trim())) {
+        throw new Error(`${label} must contain at least two non-empty choices.`);
+    }
+    if (!Array.isArray(question.answer) || question.answer.length === 0) {
+        throw new Error(`${label} must contain at least one correct answer letter.`);
+    }
+
+    const answers = question.answer.map(value => String(value).trim().toUpperCase());
+    if (new Set(answers).size !== answers.length) {
+        throw new Error(`${label} contains a duplicate correct answer letter.`);
+    }
+    const missingChoice = answers.find(key => !Object.prototype.hasOwnProperty.call(choices, key));
+    if (missingChoice) {
+        throw new Error(`${label} marks ${missingChoice} as correct, but that choice does not exist.`);
+    }
+
+    const maxSelections = question.maxSelections == null
+        ? answers.length
+        : Number(question.maxSelections);
+    if (!Number.isInteger(maxSelections) || maxSelections !== answers.length) {
+        throw new Error(`${label} maxSelections must equal its ${answers.length} correct answer(s).`);
+    }
+
+    const inferredType = answers.length === 1 ? 'single' : 'multiple-select';
+    const responseType = question.responseType || inferredType;
+    const allowedTypes = ['single', 'multiple-response', 'multiple-select'];
+    if (!allowedTypes.includes(responseType)) {
+        throw new Error(`${label} responseType must be single, multiple-response, or multiple-select.`);
+    }
+    if (responseType === 'single' && answers.length !== 1) {
+        throw new Error(`${label} is single-answer but contains ${answers.length} correct answers.`);
+    }
+    if (responseType !== 'single' && answers.length < 2) {
+        throw new Error(`${label} is ${responseType} but contains fewer than two correct answers.`);
+    }
+
+    // Older saved/imported arrays did not have descriptions. Keep those arrays
+    // usable, but when the field is present require one explanation per answer.
+    const rawDescriptions = question.answerDescriptions;
+    if (rawDescriptions != null && (
+        typeof rawDescriptions !== 'object' ||
+        Array.isArray(rawDescriptions)
+    )) {
+        throw new Error(`${label} answerDescriptions must be an object keyed by correct answer letter.`);
+    }
+
+    const answerDescriptions = {};
+    for (const key of answers) {
+        const description = rawDescriptions && rawDescriptions[key];
+        if (rawDescriptions && (typeof description !== 'string' || !description.trim())) {
+            throw new Error(`${label} needs a non-empty description for correct answer ${key}.`);
+        }
+        if (typeof description === 'string' && description.trim()) {
+            answerDescriptions[key] = description.trim();
+        }
+    }
+
+    return Object.assign({}, question, {
+        text: question.text.trim(),
+        choices,
+        answer: answers,
+        answerDescriptions,
+        responseType,
+        maxSelections
+    });
+}
+
 function importManualSet() {
     const titleInput = document.getElementById('manualSetTitle');
     const questionsInput = document.getElementById('manualSetQuestions');
@@ -418,29 +609,12 @@ function importManualSet() {
             throw new Error('The imported value must be a non-empty array.');
         }
 
-        const invalidQuestionIndex = parsedArray.findIndex((question) => (
-            !question ||
-            typeof question !== 'object' ||
-            typeof question.text !== 'string' ||
-            !question.text.trim() ||
-            !question.choices ||
-            typeof question.choices !== 'object' ||
-            Array.isArray(question.choices) ||
-            Object.keys(question.choices).length === 0 ||
-            !Array.isArray(question.answer) ||
-            question.answer.length === 0
-        ));
-
-        if (invalidQuestionIndex !== -1) {
-            throw new Error(
-                `Question ${invalidQuestionIndex + 1} must contain valid text, choices, and answer fields.`
-            );
-        }
+        const normalizedQuestions = parsedArray.map(normalizeImportedQuestion);
 
         const savedSet = QSetStore.save({
             title: titleValue,
             source: { type: 'manual-import' },
-            questions: parsedArray
+            questions: normalizedQuestions
         });
 
         if (!savedSet) {
@@ -764,6 +938,13 @@ function startSelectedMode() {
     }
 }
 
+function updateExamModeHeader(trainingMode) {
+    const title = document.getElementById('modeTitle');
+    const context = document.getElementById('modeContext');
+    if (title) title.textContent = trainingMode ? 'Training Mode' : 'Exam Mode';
+    if (context) context.textContent = trainingMode ? 'Guided practice session' : 'Active assessment';
+}
+
 // Kept for backwards compatibility — any old caller now just selects Training.
 function showTrainingOptions() {
     selectMode('training');
@@ -775,7 +956,7 @@ function startExamMode() {
     sessionActive = true;
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('examContainer').style.display = 'block';
-    document.getElementById('modeTitle').textContent = 'Exam Mode';
+    updateExamModeHeader(false);
     document.getElementById('trainingFeedback').style.display = 'none';
     initializeExam();
 }
@@ -810,7 +991,7 @@ function beginTraining() {
 
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('examContainer').style.display = 'block';
-    document.getElementById('modeTitle').textContent = 'Training Mode';
+    updateExamModeHeader(true);
     document.getElementById('trainingFeedback').style.display = 'none';
 
     initializeExam();
@@ -830,7 +1011,7 @@ function startTrainingMode(unlimited) {
     
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('examContainer').style.display = 'block';
-    document.getElementById('modeTitle').textContent = 'Training Mode';
+    updateExamModeHeader(true);
     initializeExam();
 }
 
@@ -846,7 +1027,7 @@ function continueSession() {
         sessionActive = true;
         document.getElementById('dashboard').style.display = 'none';
         document.getElementById('examContainer').style.display = 'block';
-        document.getElementById('modeTitle').textContent = isTrainingMode ? 'Training Mode' : 'Exam Mode';
+        updateExamModeHeader(isTrainingMode);
         document.getElementById('trainingFeedback').style.display = 'none';
         initializeExam();
     }
@@ -905,6 +1086,53 @@ function initializeExam() {
     updateProgress();
 }
 
+function getQuestionResponseInstruction(question) {
+    const maxSelections = question.maxSelections || 1;
+    if (maxSelections <= 1) return '';
+    if (question.responseType === 'multiple-response') {
+        return `(Select all correct answers — ${maxSelections} total)`;
+    }
+    return `(Select exactly ${maxSelections} answers)`;
+}
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function buildAnswerDescriptionsHtml(question) {
+    if (!question || !question.answerDescriptions || typeof question.answerDescriptions !== 'object') {
+        return '';
+    }
+
+    const correctAnswers = Array.isArray(question.answer) ? question.answer : [question.answer];
+    const items = correctAnswers.map((key) => {
+        const description = question.answerDescriptions[key];
+        if (typeof description !== 'string' || !description.trim()) return '';
+        const choiceText = question.choices && question.choices[key]
+            ? ` — ${escapeHtml(question.choices[key])}`
+            : '';
+        return `
+            <div class="answer-description">
+                <span class="answer-description__answer">${escapeHtml(key)}${choiceText}</span>
+                <p>${escapeHtml(description)}</p>
+            </div>
+        `;
+    }).filter(Boolean);
+
+    if (!items.length) return '';
+    return `
+        <div class="answer-descriptions">
+            <p class="answer-descriptions__title">Answer rationale</p>
+            ${items.join('')}
+        </div>
+    `;
+}
+
 // Modified displayQuestion to show feedback in training mode
 function displayQuestion() {
     if (typeof questions === 'undefined' || !questions[currentQuestion]) return;
@@ -914,25 +1142,29 @@ function displayQuestion() {
     
     document.getElementById('questionNumber').textContent = `Question ${currentQuestion + 1} of ${questions.length}`;
     
-    // Add instruction about multiple selections
+    // Add the instruction associated with this question's response type.
     let instructionText = question.text;
-    if (maxSelections > 1) {
-        instructionText += `\n\n(Select ${maxSelections} answers)`;
-    }
+    const responseInstruction = getQuestionResponseInstruction(question);
+    if (responseInstruction) instructionText += `\n\n${responseInstruction}`;
     document.getElementById('questionText').innerText = instructionText;
     
     const choicesContainer = document.getElementById('choices');
     choicesContainer.innerHTML = '';
+    choicesContainer.setAttribute('role', maxSelections === 1 ? 'radiogroup' : 'group');
+    choicesContainer.setAttribute('aria-label', maxSelections === 1 ? 'Choose one answer' : `Choose ${maxSelections} answers`);
     
     Object.entries(question.choices).forEach(([key, value]) => {
-        const choiceDiv = document.createElement('div');
+        const choiceDiv = document.createElement('button');
+        choiceDiv.type = 'button';
         choiceDiv.className = 'choice';
         choiceDiv.dataset.choiceKey = key;
+        choiceDiv.setAttribute('role', maxSelections === 1 ? 'radio' : 'checkbox');
+        choiceDiv.setAttribute('aria-checked', 'false');
         choiceDiv.onclick = () => selectAnswer(key);
 
         choiceDiv.innerHTML = `
-            <div class="choice-label">${key}</div>
-            <div class="choice-content">${value}</div>
+            <span class="choice-label">${escapeHtml(key)}</span>
+            <span class="choice-content">${escapeHtml(value)}</span>
         `;
         choicesContainer.appendChild(choiceDiv);
     });
@@ -966,8 +1198,32 @@ function refreshChoiceSelection() {
     const userSet = new Set(Array.isArray(userAnswer) ? userAnswer : [userAnswer]);
     choicesContainer.querySelectorAll('.choice').forEach((el) => {
         const key = el.dataset.choiceKey;
-        el.classList.toggle('selected', userSet.has(key));
+        const selected = userSet.has(key);
+        el.classList.toggle('selected', selected);
+        el.setAttribute('aria-checked', selected ? 'true' : 'false');
     });
+}
+
+function resolveAnswerSelection(currentAnswers, choice, maxSelections) {
+    const answers = Array.isArray(currentAnswers) ? currentAnswers.slice() : [];
+    const limit = Math.max(1, Number(maxSelections) || 1);
+
+    // Single-answer questions behave like radio buttons: choosing a different
+    // option replaces the old answer immediately, so a misclick is reversible.
+    if (limit === 1) {
+        return { answers: [choice], limitReached: false };
+    }
+
+    const existingIndex = answers.indexOf(choice);
+    if (existingIndex !== -1) {
+        answers.splice(existingIndex, 1);
+        return { answers, limitReached: false };
+    }
+    if (answers.length < limit) {
+        answers.push(choice);
+        return { answers, limitReached: false };
+    }
+    return { answers, limitReached: true };
 }
 
 // Training-mode per-option highlight: green check on correct answers, red X on
@@ -1008,22 +1264,12 @@ function selectAnswer(choice) {
     const question = questions[currentQuestion];
     const maxSelections = question.maxSelections || 1;
 
-    if (!Array.isArray(userAnswers[currentQuestion])) {
-        userAnswers[currentQuestion] = [];
-    }
-
-    const currentAnswers = userAnswers[currentQuestion];
-    const choiceIndex = currentAnswers.indexOf(choice);
-
-    // Toggle the clicked choice without grading a partial multi-answer set.
-    if (choiceIndex !== -1) {
-        currentAnswers.splice(choiceIndex, 1);
-    } else if (currentAnswers.length < maxSelections) {
-        currentAnswers.push(choice);
-    } else {
-        alert(`You can only select ${maxSelections} answers.`);
+    const result = resolveAnswerSelection(userAnswers[currentQuestion], choice, maxSelections);
+    if (result.limitReached) {
         return;
     }
+    userAnswers[currentQuestion] = result.answers;
+    const currentAnswers = result.answers;
 
     // Single source of truth: rebuild the visual state from userAnswers.
     refreshChoiceSelection();
@@ -1076,11 +1322,15 @@ function showQuestionFeedback() {
     }
     
     feedbackDiv.innerHTML = `
-        <div style="margin-bottom: 10px; color: ${isCorrect ? '#28a745' : '#dc3545'}; font-weight: bold;">
+        <div class="training-feedback__status ${isCorrect ? 'training-feedback__status--correct' : 'training-feedback__status--incorrect'}">
             ${isCorrect ? '✓ Correct!' : '✗ Incorrect'}
         </div>
-        <div>Your answer: ${userAnswer.length > 0 ? userAnswer.join(', ') : 'Not answered'}</div>
-        <div>Correct answer: ${Array.isArray(correctAnswer) ? correctAnswer.join(', ') : correctAnswer}</div>
+        <div class="training-feedback__answers">
+            <p><strong>Your answer:</strong> ${userAnswer.length > 0 ? userAnswer.map(escapeHtml).join(', ') : 'Not answered'}</p>
+            <p><strong>Correct answer:</strong> ${(Array.isArray(correctAnswer) ? correctAnswer : [correctAnswer]).map(escapeHtml).join(', ')}</p>
+        </div>
+        <p class="training-feedback__edit-note">Changed your mind? ${question.maxSelections > 1 ? 'Deselect a choice, then select another.' : 'Select another option.'} Feedback updates automatically.</p>
+        ${buildAnswerDescriptionsHtml(question)}
     `;
     feedbackDiv.style.display = 'block';
 }
@@ -1119,6 +1369,10 @@ function updateProgress() {
     if (progressBar) {
         progressBar.style.width = `${progress}%`;
     }
+    const progressText = document.getElementById('progressText');
+    if (progressText) progressText.textContent = `Question ${currentQuestion + 1} of ${questions.length}`;
+    const progressTrack = progressBar && progressBar.parentElement;
+    if (progressTrack) progressTrack.setAttribute('aria-valuenow', String(progress));
 }
 
 function startTimer() {
@@ -1156,9 +1410,9 @@ function updateTimerDisplay() {
     
     // Change color when time is running low
     if (timeLeft <= 300) { // 5 minutes
-        timerElement.style.color = '#ff4444';
+        timerElement.style.color = '#ffb4a8'; // readable on the teal exam header
     } else if (timeLeft <= 600) { // 10 minutes
-        timerElement.style.color = '#ff8800';
+        timerElement.style.color = '#ffd58a';
     } else {
         timerElement.style.color = '';
     }
@@ -1208,22 +1462,7 @@ function calculateScore() {
     const totalQuestions = questions.length;
 
     questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-
-        // Compare arrays for multiple choice questions
-        if (Array.isArray(correctAnswer)) {
-            const sortedUserAnswer = [...userAnswer].sort();
-            const sortedCorrectAnswer = [...correctAnswer].sort();
-
-            if (JSON.stringify(sortedUserAnswer) === JSON.stringify(sortedCorrectAnswer)) {
-                correctCount++;
-            }
-        } else {
-            if (userAnswer[0] === correctAnswer) {
-                correctCount++;
-            }
-        }
+        if (isQuestionResponseCorrect(question, index)) correctCount++;
     });
 
     lastScoreCorrectCount = correctCount;
@@ -1236,118 +1475,69 @@ function calculateScore() {
     const incorrectCountEl = document.getElementById('incorrectCount');
     const finalScoreEl = document.getElementById('finalScore');
     const scorePercentageEl = document.getElementById('scorePercentage');
+    const totalQuestionsEl = document.getElementById('totalQuestionsCount');
+    const scoreTitleEl = document.getElementById('scoreTitle');
+    const resultSummaryEl = document.getElementById('resultSummaryText');
+    const resultHero = document.getElementById('resultHero');
+    const performance = getPerformanceCopy(percentage, correctCount, totalQuestions, 'exam');
     
+    if (totalQuestionsEl) totalQuestionsEl.textContent = totalQuestions;
     if (correctCountEl) correctCountEl.textContent = correctCount;
     if (incorrectCountEl) incorrectCountEl.textContent = incorrectCount;
     if (finalScoreEl) finalScoreEl.textContent = `${percentage}%`;
-    if (scorePercentageEl) {
-        scorePercentageEl.innerHTML = `
-            <div style="font-size: 4rem; font-weight: bold; color: ${percentage >= 70 ? '#4CAF50' : '#f44336'}">
-                ${percentage}%
-            </div>
-            <div style="font-size: 1.2rem; margin-top: 10px;">
-                ${percentage >= 70 ? 'Congratulations! You passed!' : 'Better luck next time!'}
-            </div>
-        `;
-    }
-    
+    if (scoreTitleEl) scoreTitleEl.textContent = performance.title;
+    if (resultSummaryEl) resultSummaryEl.textContent = performance.summary;
+    if (resultHero) resultHero.dataset.tone = performance.tone;
+    if (scorePercentageEl) scorePercentageEl.innerHTML = buildScoreRingHtml(percentage, 'Overall score');
+
     generateQuestionReview();
 }
 
 function generateQuestionReview() {
     const reviewContainer = document.getElementById('questionReview');
     if (!reviewContainer || typeof questions === 'undefined') return;
-    
-    reviewContainer.innerHTML = '<h3>Question Review</h3>';
-    
-    questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-        
-        // Determine if answer is correct
-        let isCorrect = false;
-        if (Array.isArray(correctAnswer)) {
-            const sortedUserAnswer = [...userAnswer].sort();
-            const sortedCorrectAnswer = [...correctAnswer].sort();
-            isCorrect = JSON.stringify(sortedUserAnswer) === JSON.stringify(sortedCorrectAnswer);
-        } else {
-            isCorrect = userAnswer[0] === correctAnswer;
-        }
-        
-        // Format answers for display
-        const userAnswerDisplay = Array.isArray(userAnswer) && userAnswer.length > 0 
-            ? userAnswer.join(', ') 
-            : 'Not answered';
-        
-        const correctAnswerDisplay = Array.isArray(correctAnswer) 
-            ? correctAnswer.join(', ') 
-            : correctAnswer;
-        
-        const reviewItem = document.createElement('div');
-        reviewItem.className = `review-item ${isCorrect ? 'correct' : 'incorrect'}`;
-        reviewItem.innerHTML = `
-            <div class="review-question">
-                <strong>Question ${index + 1}:</strong> ${question.text.substring(0, 100)}...
-            </div>
-            <div class="review-answer">
-                <span class="answer-label">Your Answer:</span> 
-                <span class="answer-value">${userAnswerDisplay}</span>
-            </div>
-            <div class="review-correct">
-                <span class="answer-label">Correct Answer:</span> 
-                <span class="answer-value">${correctAnswerDisplay}</span>
-            </div>
-            <div class="review-status ${isCorrect ? 'status-correct' : 'status-incorrect'}">
-                ${isCorrect ? '✓ Correct' : '✗ Incorrect'}
-            </div>
-        `;
-        
-        reviewContainer.appendChild(reviewItem);
-    });
+
+    const correctCount = questions.reduce((count, question, index) => (
+        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
+    ), 0);
+    reviewContainer.innerHTML = questions.map(buildQuestionReviewCard).join('');
+
+    const allCount = document.getElementById('reviewAllCount');
+    const correctCountEl = document.getElementById('reviewCorrectCount');
+    const incorrectCountEl = document.getElementById('reviewIncorrectCount');
+    if (allCount) allCount.textContent = questions.length;
+    if (correctCountEl) correctCountEl.textContent = correctCount;
+    if (incorrectCountEl) incorrectCountEl.textContent = questions.length - correctCount;
+
+    const allButton = document.querySelector('[data-review-filter="all"]');
+    if (allButton) filterQuestionReview('all', allButton);
 }
 
 // New function for fullscreen training feedback
 function showFullscreenFeedback() {
     const feedbackContent = document.getElementById('feedbackContent');
     if (!feedbackContent || typeof questions === 'undefined') return;
-    
-    feedbackContent.innerHTML = '';
-    
-    questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-        
-        let isCorrect;
-        if (Array.isArray(correctAnswer)) {
-            const sortedUser = [...userAnswer].sort();
-            const sortedCorrect = [...correctAnswer].sort();
-            isCorrect = JSON.stringify(sortedUser) === JSON.stringify(sortedCorrect);
-        } else {
-            isCorrect = userAnswer[0] === correctAnswer;
-        }
-        
-        const questionDiv = document.createElement('div');
-        questionDiv.style.marginBottom = '20px';
-        questionDiv.style.padding = '15px';
-        questionDiv.style.borderLeft = `4px solid ${isCorrect ? '#28a745' : '#dc3545'}`;
-        questionDiv.style.backgroundColor = '#f8f9fa';
-        
-        questionDiv.innerHTML = `
-            <h3 style="margin-top: 0;">Question ${index + 1}</h3>
-            <p><strong>Question:</strong> ${question.text}</p>
-            <p style="color: ${isCorrect ? '#28a745' : '#dc3545'}">
-                <strong>${isCorrect ? '✓ Correct' : '✗ Incorrect'}</strong>
-            </p>
-            <p><strong>Your answer:</strong> ${userAnswer.length > 0 ? userAnswer.join(', ') : 'Not answered'}</p>
-            <p><strong>Correct answer:</strong> ${Array.isArray(correctAnswer) ? correctAnswer.join(', ') : correctAnswer}</p>
-        `;
-        
-        feedbackContent.appendChild(questionDiv);
-    });
+
+    const total = questions.length;
+    const correct = questions.reduce((count, question, index) => (
+        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
+    ), 0);
+    const percentage = total ? Math.round((correct / total) * 100) : 0;
+    const performance = getPerformanceCopy(percentage, correct, total, 'training');
+    const title = document.getElementById('trainingFeedbackTitle');
+    const summary = document.getElementById('trainingFeedbackSummary');
+    const score = document.getElementById('trainingFeedbackScore');
+
+    if (title) title.textContent = performance.title;
+    if (summary) summary.textContent = performance.summary;
+    if (score) score.innerHTML = buildScoreRingHtml(percentage, 'Training score');
+    feedbackContent.innerHTML = questions.map(buildQuestionReviewCard).join('');
     
     const fullscreenFeedback = document.getElementById('fullscreenFeedback');
     if (fullscreenFeedback) {
         fullscreenFeedback.style.display = 'block';
+        fullscreenFeedback.scrollTop = 0;
+        document.body.classList.add('training-results-open');
     }
 }
 
@@ -1355,6 +1545,7 @@ function closeFeedback() {
     const fullscreenFeedback = document.getElementById('fullscreenFeedback');
     if (fullscreenFeedback) {
         fullscreenFeedback.style.display = 'none';
+        document.body.classList.remove('training-results-open');
     }
     backToDashboard();
 }
@@ -1412,12 +1603,16 @@ async function bootstrapSessionHistory() {
         const r = await _authFetch('/api/history');
         if (r.ok && r.data && Array.isArray(r.data.history)) {
             historyCache = r.data.history.map(h => ({
+                id: h.id,
                 mode: h.mode,
                 score: h.score,
                 correct: h.correct,
                 total: h.total,
                 date: h.date ? new Date(h.date).toLocaleString() : '',
                 setId: h.setId,
+                setTitle: h.setTitle || 'Question set unavailable',
+                hasDetails: Boolean(h.hasDetails),
+                review: null,
             }));
         } else {
             historyCache = [];
@@ -1428,18 +1623,70 @@ async function bootstrapSessionHistory() {
     }
 }
 
+function buildSessionReviewSnapshot() {
+    if (typeof questions === 'undefined' || !Array.isArray(questions)) return null;
+
+    return {
+        version: 1,
+        questions: questions.map((question, index) => ({
+            number: index + 1,
+            text: String(question.text || ''),
+            choices: Object.fromEntries(
+                Object.entries(question.choices || {}).map(([key, value]) => [key, String(value)])
+            ),
+            answer: (Array.isArray(question.answer) ? question.answer : [question.answer])
+                .filter(answer => answer != null)
+                .map(String),
+            userAnswer: (Array.isArray(userAnswers[index]) ? userAnswers[index] : [userAnswers[index]])
+                .filter(answer => answer != null)
+                .map(String),
+            answerDescriptions: Object.fromEntries(
+                Object.entries(question.answerDescriptions || {})
+                    .filter(([, value]) => typeof value === 'string')
+            ),
+        })),
+    };
+}
+
 function saveSessionHistory(result) {
+    const activeSetId = QSetStore.getActiveId() || null;
+    const activeSummary = activeSetId
+        ? QSetStore.list().find(set => set.id === activeSetId)
+        : null;
+    const setTitle = result.setTitle ||
+        (activeSummary && activeSummary.title) ||
+        'Default question set';
+    const review = result.review || buildSessionReviewSnapshot();
+    const historyEntry = Object.assign({}, result, {
+        setId: activeSetId,
+        setTitle,
+        hasDetails: Boolean(review),
+        review,
+    });
+
     // Optimistic local push so renderSessionHistory paints immediately.
-    historyCache.unshift(result);
+    historyCache.unshift(historyEntry);
     _authFetch('/api/history', {
         method: 'POST',
         body: JSON.stringify({
-            mode: result.mode,
-            score: result.score,
-            correct: result.correct,
-            total: result.total,
-            setId: QSetStore.getActiveId() || null,
+            mode: historyEntry.mode,
+            score: historyEntry.score,
+            correct: historyEntry.correct,
+            total: historyEntry.total,
+            setId: historyEntry.setId,
+            setTitle: historyEntry.setTitle,
+            review: historyEntry.review,
         }),
+    }).then((res) => {
+        if (!res.ok || !res.data || !res.data.entry) {
+            console.warn('[history] append failed:', res.status, res.data && res.data.error);
+            return;
+        }
+        historyEntry.id = res.data.entry.id;
+        historyEntry.hasDetails = Boolean(res.data.entry.hasDetails);
+        if (res.data.entry.date) {
+            historyEntry.date = new Date(res.data.entry.date).toLocaleString();
+        }
     }).catch((e) => console.warn('[history] append failed:', e));
 }
 
@@ -1448,11 +1695,23 @@ function renderSessionHistory() {
     if (!historyList) return;
 
     if (!historyCache.length) {
-        historyList.innerHTML = '<div style="color:#888;">No session history yet.</div>';
+        historyList.innerHTML = '<div class="qsets-empty">No session history yet. Finish an exam or training session and your score will appear here.</div>';
     } else {
-        historyList.innerHTML = historyCache.map((h) => `
-            <div style="padding:8px 0; border-bottom:1px solid #eee;">
-                <strong>${h.mode}</strong> | Score: <b>${h.score}%</b> | Correct: ${h.correct}/${h.total} | Date: ${h.date}
+        historyList.innerHTML = historyCache.map((h, index) => `
+            <div class="session-history-item">
+                <div class="session-history-item__head">
+                    <strong class="session-history-item__title">${escapeHtml(h.setTitle || 'Question set unavailable')}</strong>
+                    <div class="session-history-item__actions">
+                        <span class="session-history-item__mode">${escapeHtml(h.mode)}</span>
+                        <button type="button" class="btn btn--ghost btn--sm session-history-item__details-btn"
+                                onclick="openSessionHistoryDetails(${index}, this)">Details</button>
+                    </div>
+                </div>
+                <div class="session-history-item__details">
+                    <span>Score: <b>${escapeHtml(h.score)}%</b></span>
+                    <span>Correct: ${escapeHtml(h.correct)}/${escapeHtml(h.total)}</span>
+                    <span>${escapeHtml(h.date)}</span>
+                </div>
             </div>
         `).join('');
     }
@@ -1472,6 +1731,134 @@ function renderSessionHistory() {
         }
     }
 }
+
+let sessionDetailsReturnFocus = null;
+
+function isHistoryAnswerCorrect(question) {
+    const userAnswer = Array.isArray(question.userAnswer) ? question.userAnswer.map(String).sort() : [];
+    const correctAnswer = Array.isArray(question.answer) ? question.answer.map(String).sort() : [];
+    return JSON.stringify(userAnswer) === JSON.stringify(correctAnswer);
+}
+
+function formatHistoryAnswer(answer, choices) {
+    const keys = Array.isArray(answer) ? answer : [];
+    if (!keys.length) return 'Not answered';
+    return keys.map((key) => {
+        const choice = choices && Object.prototype.hasOwnProperty.call(choices, key)
+            ? choices[key]
+            : '';
+        return escapeHtml(key) + (choice ? ' — ' + escapeHtml(choice) : '');
+    }).join('<br>');
+}
+
+function renderSessionDetails(entry, review) {
+    const title = document.getElementById('sessionDetailsTitle');
+    const meta = document.getElementById('sessionDetailsMeta');
+    const summary = document.getElementById('sessionDetailsSummary');
+    const content = document.getElementById('sessionDetailsContent');
+    if (!title || !meta || !summary || !content) return;
+
+    title.textContent = entry.setTitle || 'Session details';
+    meta.textContent = [entry.mode, entry.date].filter(Boolean).join(' • ');
+    summary.innerHTML = `
+        <span>Score <strong>${escapeHtml(entry.score)}%</strong></span>
+        <span>Correct <strong>${escapeHtml(entry.correct)}/${escapeHtml(entry.total)}</strong></span>
+    `;
+
+    const reviewQuestions = review && Array.isArray(review.questions) ? review.questions : [];
+    if (!reviewQuestions.length) {
+        content.innerHTML = `
+            <div class="session-details-empty">
+                <strong>Detailed review is unavailable for this session.</strong>
+                <p>Sessions completed before this feature only saved the final score and totals.</p>
+            </div>
+        `;
+        return;
+    }
+
+    content.innerHTML = reviewQuestions.map((question, index) => {
+        const isCorrect = isHistoryAnswerCorrect(question);
+        const choices = question.choices || {};
+        const userSet = new Set((question.userAnswer || []).map(String));
+        const correctSet = new Set((question.answer || []).map(String));
+        const choicesHtml = Object.entries(choices).map(([key, value]) => {
+            const classes = ['session-review-choice'];
+            if (correctSet.has(String(key))) classes.push('session-review-choice--correct');
+            if (userSet.has(String(key))) classes.push('session-review-choice--selected');
+            if (userSet.has(String(key)) && !correctSet.has(String(key))) classes.push('session-review-choice--incorrect');
+            return `
+                <li class="${classes.join(' ')}">
+                    <span class="session-review-choice__key">${escapeHtml(key)}</span>
+                    <span>${escapeHtml(value)}</span>
+                    ${correctSet.has(String(key)) ? '<span class="session-review-choice__tag">Correct</span>' : ''}
+                    ${userSet.has(String(key)) ? '<span class="session-review-choice__tag session-review-choice__tag--selected">Your answer</span>' : ''}
+                </li>
+            `;
+        }).join('');
+
+        return `
+            <article class="session-review-question ${isCorrect ? 'session-review-question--correct' : 'session-review-question--incorrect'}">
+                <header class="session-review-question__head">
+                    <strong>Question ${index + 1}</strong>
+                    <span class="session-review-status">${isCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
+                </header>
+                <p class="session-review-question__text">${escapeHtml(question.text)}</p>
+                <ul class="session-review-choices">${choicesHtml}</ul>
+                <div class="session-review-answers">
+                    <p><strong>Your answer</strong><br>${formatHistoryAnswer(question.userAnswer, choices)}</p>
+                    <p><strong>Correct answer</strong><br>${formatHistoryAnswer(question.answer, choices)}</p>
+                </div>
+                ${buildAnswerDescriptionsHtml(question)}
+            </article>
+        `;
+    }).join('');
+}
+
+async function openSessionHistoryDetails(index, triggerButton) {
+    const entry = historyCache[index];
+    const modal = document.getElementById('sessionDetailsModal');
+    const content = document.getElementById('sessionDetailsContent');
+    if (!entry || !modal || !content) return;
+
+    sessionDetailsReturnFocus = triggerButton || document.activeElement;
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+    renderSessionDetails(entry, entry.review);
+    const closeButton = document.getElementById('closeSessionDetailsBtn');
+    if (closeButton) closeButton.focus();
+
+    if (entry.review || !entry.hasDetails || !entry.id) return;
+    content.innerHTML = '<div class="session-details-loading">Loading exam review…</div>';
+    const res = await _authFetch('/api/history/' + encodeURIComponent(entry.id));
+    if (!res.ok || !res.data || !res.data.entry) {
+        content.innerHTML = '<div class="session-details-empty"><strong>Could not load this review.</strong><p>Please close this window and try again.</p></div>';
+        return;
+    }
+
+    entry.review = res.data.entry.review || null;
+    renderSessionDetails(Object.assign({}, entry, {
+        date: res.data.entry.date ? new Date(res.data.entry.date).toLocaleString() : entry.date,
+    }), entry.review);
+}
+
+function closeSessionHistoryDetails() {
+    const modal = document.getElementById('sessionDetailsModal');
+    if (!modal || modal.hidden) return;
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+    if (sessionDetailsReturnFocus && typeof sessionDetailsReturnFocus.focus === 'function') {
+        sessionDetailsReturnFocus.focus();
+    }
+    sessionDetailsReturnFocus = null;
+}
+
+function handleSessionDetailsBackdrop(event) {
+    if (event.target === event.currentTarget) closeSessionHistoryDetails();
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeSessionHistoryDetails();
+});
 
 function clearSessionHistory() {
     historyCache = [];
@@ -1521,153 +1908,176 @@ function submitExam() {
 // --- Track last score for history ---
 let lastScoreCorrectCount = 0;
 
+function normalizeAnswerList(answer) {
+    if (Array.isArray(answer)) return answer.map(String);
+    return answer == null ? [] : [String(answer)];
+}
+
+function isQuestionResponseCorrect(question, index) {
+    const submitted = normalizeAnswerList(userAnswers[index]).sort();
+    const expected = normalizeAnswerList(question.answer).sort();
+    return JSON.stringify(submitted) === JSON.stringify(expected);
+}
+
+function getPerformanceCopy(percentage, correct, total, mode) {
+    const isTraining = mode === 'training';
+    let title;
+    let tone;
+
+    if (percentage >= 90) {
+        title = isTraining ? 'Excellent command of the material' : 'Exceptional performance';
+        tone = 'excellent';
+    } else if (percentage >= 80) {
+        title = isTraining ? 'Strong training result' : 'Strong performance';
+        tone = 'strong';
+    } else if (percentage >= 70) {
+        title = isTraining ? 'Solid progress achieved' : 'Assessment standard achieved';
+        tone = 'passed';
+    } else if (percentage >= 50) {
+        title = isTraining ? 'Progress is taking shape' : 'Developing proficiency';
+        tone = 'developing';
+    } else {
+        title = isTraining ? 'Continue with focused practice' : 'Focused review recommended';
+        tone = 'review';
+    }
+
+    const summary = isTraining
+        ? `You answered ${correct} of ${total} questions correctly. Use the response analysis below to strengthen the concepts that need further practice.`
+        : `You answered ${correct} of ${total} questions correctly. Review the detailed feedback below before beginning your next assessment.`;
+    return { title, summary, tone };
+}
+
+function buildScoreRingHtml(percentage, label) {
+    const safePercentage = Math.max(0, Math.min(100, Number(percentage) || 0));
+    return `
+        <div class="result-score-ring" style="--score-angle: ${safePercentage * 3.6}deg;">
+            <div class="result-score-ring__inner">
+                <strong>${safePercentage}%</strong>
+                <span>${escapeHtml(label)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function buildQuestionReviewCard(question, index) {
+    const isCorrect = isQuestionResponseCorrect(question, index);
+    const submitted = normalizeAnswerList(userAnswers[index]);
+    const expected = normalizeAnswerList(question.answer);
+    const choices = question.choices || {};
+
+    return `
+        <article class="review-item ${isCorrect ? 'correct' : 'incorrect'}" data-review-state="${isCorrect ? 'correct' : 'incorrect'}">
+            <header class="review-item__header">
+                <span class="review-item__number">Question ${index + 1}</span>
+                <span class="review-status ${isCorrect ? 'correct' : 'incorrect'}">
+                    ${isCorrect ? '✓ Correct response' : '● Needs review'}
+                </span>
+            </header>
+            <p class="review-question">${escapeHtml(question.text)}</p>
+            <div class="review-answer-grid">
+                <div class="review-answer-panel ${isCorrect ? 'review-answer-panel--correct' : 'review-answer-panel--submitted'}">
+                    <span class="answer-label">Your response</span>
+                    <span class="answer-value">${formatHistoryAnswer(submitted, choices)}</span>
+                </div>
+                <div class="review-answer-panel review-answer-panel--expected">
+                    <span class="answer-label">Expected answer</span>
+                    <span class="answer-value">${formatHistoryAnswer(expected, choices)}</span>
+                </div>
+            </div>
+            ${buildAnswerDescriptionsHtml(question)}
+        </article>
+    `;
+}
+
+function filterQuestionReview(filter, button) {
+    document.querySelectorAll('[data-review-filter]').forEach((filterButton) => {
+        const active = filterButton === button;
+        filterButton.classList.toggle('review-filter--active', active);
+        filterButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('#questionReview [data-review-state]').forEach((item) => {
+        item.hidden = filter !== 'all' && item.dataset.reviewState !== filter;
+    });
+}
+
 function calculateScore() {
     if (typeof questions === 'undefined') return;
 
-    let correctCount = 0;
     const totalQuestions = questions.length;
-
-    questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-
-        // Compare arrays for multiple choice questions
-        if (Array.isArray(correctAnswer)) {
-            const sortedUserAnswer = [...userAnswer].sort();
-            const sortedCorrectAnswer = [...correctAnswer].sort();
-
-            if (JSON.stringify(sortedUserAnswer) === JSON.stringify(sortedCorrectAnswer)) {
-                correctCount++;
-            }
-        } else {
-            if (userAnswer[0] === correctAnswer) {
-                correctCount++;
-            }
-        }
-    });
-
+    const correctCount = questions.reduce((count, question, index) => (
+        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
+    ), 0);
+    const percentage = totalQuestions ? Math.round((correctCount / totalQuestions) * 100) : 0;
+    const incorrectCount = totalQuestions - correctCount;
+    const performance = getPerformanceCopy(percentage, correctCount, totalQuestions, 'exam');
     lastScoreCorrectCount = correctCount;
 
-    const percentage = Math.round((correctCount / totalQuestions) * 100);
-    const incorrectCount = totalQuestions - correctCount;
-    
-    // Update score display
+    const totalQuestionsEl = document.getElementById('totalQuestionsCount');
     const correctCountEl = document.getElementById('correctCount');
     const incorrectCountEl = document.getElementById('incorrectCount');
     const finalScoreEl = document.getElementById('finalScore');
     const scorePercentageEl = document.getElementById('scorePercentage');
-    
+    const scoreTitleEl = document.getElementById('scoreTitle');
+    const resultSummaryEl = document.getElementById('resultSummaryText');
+    const resultHero = document.getElementById('resultHero');
+
+    if (totalQuestionsEl) totalQuestionsEl.textContent = totalQuestions;
     if (correctCountEl) correctCountEl.textContent = correctCount;
     if (incorrectCountEl) incorrectCountEl.textContent = incorrectCount;
     if (finalScoreEl) finalScoreEl.textContent = `${percentage}%`;
-    if (scorePercentageEl) {
-        scorePercentageEl.innerHTML = `
-            <div style="font-size: 4rem; font-weight: bold; color: ${percentage >= 70 ? '#4CAF50' : '#f44336'}">
-                ${percentage}%
-            </div>
-            <div style="font-size: 1.2rem; margin-top: 10px;">
-                ${percentage >= 70 ? 'Congratulations! You passed!' : 'Better luck next time!'}
-            </div>
-        `;
-    }
-    
+    if (scoreTitleEl) scoreTitleEl.textContent = performance.title;
+    if (resultSummaryEl) resultSummaryEl.textContent = performance.summary;
+    if (resultHero) resultHero.dataset.tone = performance.tone;
+    if (scorePercentageEl) scorePercentageEl.innerHTML = buildScoreRingHtml(percentage, 'Overall score');
+
     generateQuestionReview();
 }
 
 function generateQuestionReview() {
     const reviewContainer = document.getElementById('questionReview');
     if (!reviewContainer || typeof questions === 'undefined') return;
-    
-    reviewContainer.innerHTML = '<h3>Question Review</h3>';
-    
-    questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-        
-        // Determine if answer is correct
-        let isCorrect = false;
-        if (Array.isArray(correctAnswer)) {
-            const sortedUserAnswer = [...userAnswer].sort();
-            const sortedCorrectAnswer = [...correctAnswer].sort();
-            isCorrect = JSON.stringify(sortedUserAnswer) === JSON.stringify(sortedCorrectAnswer);
-        } else {
-            isCorrect = userAnswer[0] === correctAnswer;
-        }
-        
-        // Format answers for display
-        const userAnswerDisplay = Array.isArray(userAnswer) && userAnswer.length > 0 
-            ? userAnswer.join(', ') 
-            : 'Not answered';
-        
-        const correctAnswerDisplay = Array.isArray(correctAnswer) 
-            ? correctAnswer.join(', ') 
-            : correctAnswer;
-        
-        const reviewItem = document.createElement('div');
-        reviewItem.className = `review-item ${isCorrect ? 'correct' : 'incorrect'}`;
-        reviewItem.innerHTML = `
-            <div class="review-question">
-                <strong>Question ${index + 1}:</strong> ${question.text.substring(0, 100)}...
-            </div>
-            <div class="review-answer">
-                <span class="answer-label">Your Answer:</span> 
-                <span class="answer-value">${userAnswerDisplay}</span>
-            </div>
-            <div class="review-correct">
-                <span class="answer-label">Correct Answer:</span> 
-                <span class="answer-value">${correctAnswerDisplay}</span>
-            </div>
-            <div class="review-status ${isCorrect ? 'status-correct' : 'status-incorrect'}">
-                ${isCorrect ? '✓ Correct' : '✗ Incorrect'}
-            </div>
-        `;
-        
-        reviewContainer.appendChild(reviewItem);
-    });
+
+    const correctCount = questions.reduce((count, question, index) => (
+        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
+    ), 0);
+    reviewContainer.innerHTML = questions.map(buildQuestionReviewCard).join('');
+
+    const allCount = document.getElementById('reviewAllCount');
+    const correctCountEl = document.getElementById('reviewCorrectCount');
+    const incorrectCountEl = document.getElementById('reviewIncorrectCount');
+    if (allCount) allCount.textContent = questions.length;
+    if (correctCountEl) correctCountEl.textContent = correctCount;
+    if (incorrectCountEl) incorrectCountEl.textContent = questions.length - correctCount;
+
+    const allButton = document.querySelector('[data-review-filter="all"]');
+    if (allButton) filterQuestionReview('all', allButton);
 }
 
 // New function for fullscreen training feedback
 function showFullscreenFeedback() {
     const feedbackContent = document.getElementById('feedbackContent');
     if (!feedbackContent || typeof questions === 'undefined') return;
-    
-    feedbackContent.innerHTML = '';
-    
-    questions.forEach((question, index) => {
-        const userAnswer = userAnswers[index] || [];
-        const correctAnswer = question.answer;
-        
-        let isCorrect;
-        if (Array.isArray(correctAnswer)) {
-            const sortedUser = [...userAnswer].sort();
-            const sortedCorrect = [...correctAnswer].sort();
-            isCorrect = JSON.stringify(sortedUser) === JSON.stringify(sortedCorrect);
-        } else {
-            isCorrect = userAnswer[0] === correctAnswer;
-        }
-        
-        const questionDiv = document.createElement('div');
-        questionDiv.style.marginBottom = '20px';
-        questionDiv.style.padding = '15px';
-        questionDiv.style.borderLeft = `4px solid ${isCorrect ? '#28a745' : '#dc3545'}`;
-        questionDiv.style.backgroundColor = '#f8f9fa';
-        
-        questionDiv.innerHTML = `
-            <h3 style="margin-top: 0;">Question ${index + 1}</h3>
-            <p><strong>Question:</strong> ${question.text}</p>
-            <p style="color: ${isCorrect ? '#28a745' : '#dc3545'}">
-                <strong>${isCorrect ? '✓ Correct' : '✗ Incorrect'}</strong>
-            </p>
-            <p><strong>Your answer:</strong> ${userAnswer.length > 0 ? userAnswer.join(', ') : 'Not answered'}</p>
-            <p><strong>Correct answer:</strong> ${Array.isArray(correctAnswer) ? correctAnswer.join(', ') : correctAnswer}</p>
-        `;
-        
-        feedbackContent.appendChild(questionDiv);
-    });
+
+    const total = questions.length;
+    const correct = questions.reduce((count, question, index) => (
+        count + (isQuestionResponseCorrect(question, index) ? 1 : 0)
+    ), 0);
+    const percentage = total ? Math.round((correct / total) * 100) : 0;
+    const performance = getPerformanceCopy(percentage, correct, total, 'training');
+    const title = document.getElementById('trainingFeedbackTitle');
+    const summary = document.getElementById('trainingFeedbackSummary');
+    const score = document.getElementById('trainingFeedbackScore');
+
+    if (title) title.textContent = performance.title;
+    if (summary) summary.textContent = performance.summary;
+    if (score) score.innerHTML = buildScoreRingHtml(percentage, 'Training score');
+    feedbackContent.innerHTML = questions.map(buildQuestionReviewCard).join('');
     
     const fullscreenFeedback = document.getElementById('fullscreenFeedback');
     if (fullscreenFeedback) {
         fullscreenFeedback.style.display = 'block';
+        fullscreenFeedback.scrollTop = 0;
+        document.body.classList.add('training-results-open');
     }
 }
 
@@ -1675,6 +2085,7 @@ function closeFeedback() {
     const fullscreenFeedback = document.getElementById('fullscreenFeedback');
     if (fullscreenFeedback) {
         fullscreenFeedback.style.display = 'none';
+        document.body.classList.remove('training-results-open');
     }
     backToDashboard();
 }
@@ -2214,6 +2625,8 @@ function tryFinalizePendingSave() {
             text: q.text,
             choices: Object.assign({}, q.choices || {}),
             answer: Array.isArray(q.answer) ? q.answer.slice() : [q.answer],
+            answerDescriptions: Object.assign({}, q.answerDescriptions || {}),
+            responseType: q.responseType || ((Array.isArray(q.answer) ? q.answer.length : 1) > 1 ? 'multiple-select' : 'single'),
             maxSelections: q.maxSelections || 1
         }));
 
@@ -2296,7 +2709,8 @@ function renderQuestionSets() {
             useBtn.type = 'button';
             useBtn.className = 'btn btn--secondary btn--sm';
             useBtn.textContent = 'Use';
-            useBtn.addEventListener('click', () => activateQuestionSet(s.id));
+            useBtn.setAttribute('aria-label', 'Use ' + (s.title || 'this question set'));
+            useBtn.addEventListener('click', (event) => activateQuestionSet(s.id, event.currentTarget));
             actions.appendChild(useBtn);
         }
 
@@ -2314,15 +2728,68 @@ function renderQuestionSets() {
     }
 }
 
-function activateQuestionSet(id) {
-    const record = QSetStore.get(id);
-    if (!record) return;
-    QSetStore.setActiveId(id);
-    // The questions array we'll load is structurally different from any in-flight
-    // session, so drop the in-progress state (history is preserved).
-    try { localStorage.removeItem('examSessionData'); } catch (_) {}
-    // Reload so questions.js loads cleanly and DOMContentLoaded re-hydrates from the new active set.
-    window.location.reload();
+function setQuestionSetsStatus(message, type) {
+    const status = document.getElementById('questionSetsStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.className = 'qsets-status' + (type ? ' qsets-status--' + type : '');
+    status.style.display = message ? 'block' : 'none';
+}
+
+async function activateQuestionSet(id, button) {
+    const summary = QSetStore.list().find(s => s.id === id);
+    if (!summary) {
+        setQuestionSetsStatus('That question set is no longer available. Refresh the page and try again.', 'error');
+        return false;
+    }
+
+    const originalLabel = button ? button.textContent : 'Use';
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Loading…';
+        button.setAttribute('aria-busy', 'true');
+    }
+    setQuestionSetsStatus('Loading "' + (summary.title || 'Question set') + '"…');
+
+    try {
+        // List responses intentionally contain summaries only. Fetch the full
+        // record on demand instead of silently returning when it is not cached.
+        const record = await QSetStore.loadFull(id);
+        if (!record || !Array.isArray(record.questions) || !record.questions.length) {
+            throw new Error('This question set has no usable questions.');
+        }
+
+        const activated = await QSetStore.setActiveId(id);
+        if (!activated) {
+            throw new Error('The active question set could not be saved. Check your connection and try again.');
+        }
+        if (!replaceLoadedQuestions(record.questions)) {
+            throw new Error('The exam question bank could not be loaded. Refresh the page and try again.');
+        }
+
+        // The new question bank cannot safely resume an old in-progress session.
+        try { localStorage.removeItem('examSessionData'); } catch (_) {}
+        currentQuestion = 0;
+        userAnswers = {};
+        sessionActive = false;
+        clearModeSelection();
+        try { renderSessionHistory(); } catch (_) {}
+        renderQuestionSets();
+        setQuestionSetsStatus(
+            '"' + (summary.title || 'Question set') + '" is active. Choose Exam Mode or Training Mode above to start.',
+            'success'
+        );
+        return true;
+    } catch (e) {
+        console.warn('[QSetStore] activation failed:', e);
+        setQuestionSetsStatus(e && e.message ? e.message : 'Could not use that question set. Please try again.', 'error');
+        if (button && button.isConnected) {
+            button.disabled = false;
+            button.textContent = originalLabel;
+            button.removeAttribute('aria-busy');
+        }
+        return false;
+    }
 }
 
 function deleteQuestionSet(id) {

@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All Purpose Exam Questioners</title>
+    <meta name="description" content="Create exam question sets from your PDFs, practise in timed or guided sessions, and review every answer.">
+    <meta name="theme-color" content="#06525c">
+    <title>Exam Review &amp; Practice Suite</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="Cert.css">
 </head>
 <body>
-    <div class="credits">
-        <a href="https://github.com/DarryllPj77" target="_blank" rel="noopener">Built by DarryllPj77 · questions are not mine</a>
-    </div>
+    <a class="skip-link" href="#dashboard">Skip to main content</a>
 
     <!-- Auth gate: shown while signed-out, hidden after a successful sign in. -->
     <div id="authOverlay" class="auth-overlay" style="display: flex;" role="dialog" aria-modal="true" aria-labelledby="authTitle">
         <section class="auth-card">
             <header class="auth-card__head">
-                <span class="dashboard-eyebrow">All Purpose Exam Questioners</span>
+                <span class="brand brand--auth" aria-hidden="true"><span class="brand__mark">Q</span>Exam Review Suite</span>
                 <h2 id="authTitle">Sign in to continue</h2>
-                <p id="authSubtitle">Your question sets and history stay with your account.</p>
+                <p id="authSubtitle">Access your private question library, active sessions, and performance history.</p>
             </header>
 
             <div class="auth-tabs" role="tablist">
@@ -48,6 +48,9 @@
         </section>
     </div>
 
+    <header class="app-bar">
+        <div class="app-bar__inner">
+            <span class="brand"><span class="brand__mark" aria-hidden="true">Q</span><span class="brand__name">Exam Review Suite</span></span>
     <!-- Signed-in user pill — populated by Cert.js once /api/auth/me succeeds. -->
     <div id="userPill" class="user-pill" style="display: none;">
         <span class="user-pill__avatar" aria-hidden="true"></span>
@@ -55,19 +58,21 @@
         <span class="user-pill__usage" id="userPlanUsage" style="display: none;"></span>
         <button type="button" class="user-pill__signout" onclick="signOut()" title="Sign out">Sign out</button>
     </div>
+        </div>
+    </header>
 
     <main class="container dashboard" id="dashboard" style="display: block;">
         <section class="dashboard-hero">
-            <span class="dashboard-eyebrow">Reviewer · Practice Suite</span>
-            <h1>All Purpose Exam Questioners</h1>
-            <p class="dashboard-tagline">Pick a study mode, set your time, or drop in a PDF to generate a fresh question set.</p>
+            <span class="dashboard-eyebrow">Assessment workspace</span>
+            <h1>Exam Review &amp; Practice Suite</h1>
+            <p class="dashboard-tagline">Turn a PDF into an exam, practise in timed or guided sessions, and review every answer afterwards.</p>
         </section>
 
         <section class="dashboard-grid">
             <article class="card card--actions">
                 <header class="card-head">
-                    <h2>Start a session</h2>
-                    <p>Choose how you want to study today.</p>
+                    <h2>Begin a study session</h2>
+                    <p>Select the experience that best supports your current learning goal.</p>
                 </header>
 
                 <div class="mode-grid" role="radiogroup" aria-label="Session mode">
@@ -77,7 +82,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M5 22h14a2 2 0 0 0 2-2V8l-6-6H7a2 2 0 0 0-2 2v2"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><circle cx="8" cy="16" r="5"/><path d="M8 13.5V16l1.5 1"/></svg>
                         </span>
                         <span class="mode-card__title">Exam Mode</span>
-                        <span class="mode-card__sub">Timed run · results at the end</span>
+                        <span class="mode-card__sub">Timed assessment · feedback after submission</span>
                     </button>
                     <button type="button" class="mode-card mode-card--accent" id="startTrainingBtn" role="radio" aria-checked="false" onclick="selectMode('training')" aria-label="Select training mode">
                         <span class="mode-card__check" aria-hidden="true">✓</span>
@@ -85,7 +90,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                         </span>
                         <span class="mode-card__title">Training Mode</span>
-                        <span class="mode-card__sub">Instant feedback per question</span>
+                        <span class="mode-card__sub">Guided practice · immediate answer feedback</span>
                     </button>
                 </div>
 
@@ -112,15 +117,15 @@
 
             <article class="card card--upload">
                 <header class="card-head">
-                    <h2>Generate from PDF</h2>
-                    <p>Drop a study PDF — Gemini will draft a new question set for you.</p>
+                    <h2>Generate from a PDF</h2>
+                    <p>Upload study material to create a structured question set for focused review.</p>
                 </header>
                 <div id="dropZone" class="upload-zone" tabindex="0" role="button" aria-label="Upload a PDF file">
                     <div class="upload-zone__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </div>
-                    <p class="upload-zone-text"><strong>Drop a PDF here</strong> or click to browse</p>
-                    <p class="upload-zone-hint">.pdf only · up to 25 MB</p>
+                    <p class="upload-zone-text"><strong>Drop a PDF here</strong> or select a file</p>
+                    <p class="upload-zone-hint">PDF format · maximum file size of 25 MB</p>
                     <p id="selectedFileName" class="upload-file-name"></p>
                     <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" style="display: none;">
                 </div>
@@ -165,47 +170,71 @@
 
             <article class="card card--import">
                 <header class="card-head">
-                    <h2>Import Question Set</h2>
-                    <p>Copy the AI prompt, generate questions, then paste the raw JavaScript array below.</p>
+                    <h2>Import a question set</h2>
+                    <p>Select a response format, copy the prompt, then paste the generated JavaScript array below.</p>
                 </header>
 
+                <div class="import-layout">
+                <div class="import-layout__side">
+                <fieldset class="prompt-type-picker">
+                    <legend class="field-label">AI prompt question type</legend>
+                    <div class="prompt-type-options" role="radiogroup" aria-label="AI prompt question type">
+                        <button type="button" class="prompt-type-option is-selected" data-prompt-type="single" role="radio" aria-checked="true" onclick="selectPromptQuestionType('single')">
+                            <span class="prompt-type-option__title">Single Answer</span>
+                            <span class="prompt-type-option__hint">Exactly one correct choice</span>
+                        </button>
+                        <button type="button" class="prompt-type-option" data-prompt-type="multiple-response" role="radio" aria-checked="false" onclick="selectPromptQuestionType('multiple-response')">
+                            <span class="prompt-type-option__title">Multiple Response</span>
+                            <span class="prompt-type-option__hint">Select all correct choices</span>
+                        </button>
+                        <button type="button" class="prompt-type-option" data-prompt-type="multiple-select" role="radio" aria-checked="false" onclick="selectPromptQuestionType('multiple-select')">
+                            <span class="prompt-type-option__title">Multiple Select</span>
+                            <span class="prompt-type-option__hint">Choose exactly N choices</span>
+                        </button>
+                    </div>
+                    <p id="promptTypeHint" class="prompt-type-hint" aria-live="polite">The copied prompt will require exactly one correct answer per question.</p>
+                </fieldset>
+
                 <button type="button" class="btn btn--secondary btn--full" id="copyPromptTemplateBtn" onclick="copyPromptTemplate()">
-                    Copy AI Prompt Template
+                    Copy Single-Answer AI Prompt
                 </button>
 
                 <div>
-                    <label for="manualSetTitle" class="field-label">Set Title</label>
-                    <input type="text" class="text-input" id="manualSetTitle" placeholder="e.g. XML Fundamentals" autocomplete="off" style="width: 100%;">
-                </div>
-
-                <div>
-                    <label for="manualSetQuestions" class="field-label">JavaScript Question Array</label>
-                    <textarea class="text-input" id="manualSetQuestions" rows="16" spellcheck="false" placeholder="Paste the raw JavaScript array here..." style="width: 100%; min-height: 280px; resize: vertical; font-family: var(--ff-mono);"></textarea>
+                    <label for="manualSetTitle" class="field-label">Set title</label>
+                    <input type="text" class="text-input text-input--block" id="manualSetTitle" placeholder="e.g. XML Fundamentals" autocomplete="off">
                 </div>
 
                 <button type="button" class="btn btn--primary btn--full" onclick="importManualSet()">
-                    Save to Question Sets
+                    Save to question sets
                 </button>
 
                 <div id="manualImportStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
+                </div>
+
+                <div class="import-layout__editor">
+                    <label for="manualSetQuestions" class="field-label">JavaScript question array</label>
+                    <textarea class="text-input code-input" id="manualSetQuestions" rows="16" spellcheck="false" placeholder="Paste the raw JavaScript array here..."></textarea>
+                </div>
+                </div>
             </article>
         </section>
 
         <section class="card card--qsets" id="questionSetsSection">
             <header class="card-head">
-                <h2>Question sets</h2>
-                <p>Generated sets are saved on this device. The active set powers your sessions.</p>
+                <h2>Question library</h2>
+                <p>Manage your private question sets and select which one will be used in your next session.</p>
             </header>
+            <p id="questionSetsStatus" class="qsets-status" role="status" aria-live="polite" style="display: none;"></p>
             <div id="questionSetsList" class="qsets-list"></div>
         </section>
 
         <section class="card card--history" id="sessionHistory" style="display: block;">
             <header class="card-head card-head--inline">
                 <div>
-                    <h2>Session history</h2>
-                    <p>Your last attempts on this device.</p>
+                    <h2>Performance history</h2>
+                    <p>Review recent assessments, scores, and detailed answer feedback.</p>
                 </div>
-                <button type="button" class="btn btn--ghost btn--sm" id="clearHistoryBtn" onclick="clearSessionHistory()">Clear</button>
+                <button type="button" class="btn btn--ghost btn--sm" id="clearHistoryBtn" onclick="clearSessionHistory()">Clear history</button>
             </header>
             <div id="historyList"></div>
             <div id="incompleteSessionNotice" class="incomplete-notice" style="display: none;">
@@ -213,19 +242,37 @@
                 <span>There's an unfinished session — pick up where you left off.</span>
             </div>
         </section>
+
+        <footer class="app-footer">
+            <a href="https://github.com/DarryllPj77" target="_blank" rel="noopener">Built by DarryllPj77</a>
+            <span aria-hidden="true">·</span>
+            <span>Question content belongs to its original authors</span>
+        </footer>
     </main>
 
     <div class="container" id="examContainer" style="display: none;">
         <div class="header">
-            <h1 id="modeTitle">Exam Mode</h1>
-            <div class="timer" id="timer"></div>
-            <div class="progress-bar">
+            <div class="exam-header__row">
+                <div class="exam-header__identity">
+                    <span class="exam-header__eyebrow" id="modeContext">Active assessment</span>
+                    <h1 id="modeTitle">Exam Mode</h1>
+                </div>
+                <div class="exam-timer-block">
+                    <span>Time remaining</span>
+                    <div class="timer" id="timer"></div>
+                </div>
+            </div>
+            <div class="exam-progress-meta">
+                <span>Session progress</span>
+                <span id="progressText">Question 1</span>
+            </div>
+            <div class="progress-bar" role="progressbar" aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                 <div class="progress-fill" id="progressBar"></div>
             </div>
         </div>
 
         <div class="exam-content" id="examContent">
-            <button class="back-button" onclick="backToDashboard()">← Back to Dashboard</button>
+            <button class="back-button" onclick="backToDashboard()">← Return to dashboard</button>
             <div class="question-card">
                 <div class="question-header">
                     <div class="question-number" id="questionNumber"></div>
@@ -238,42 +285,99 @@
             <div class="navigation">
                 <button class="nav-button nav-button--secondary" id="prevButton" onclick="previousQuestion()">Previous</button>
                 <button class="nav-button" id="nextButton" onclick="nextQuestion()">Next</button>
-                <button class="nav-button submit-button" id="submitButton" style="display: none;" onclick="submitExam()">Submit</button>
+                <button class="nav-button submit-button" id="submitButton" style="display: none;" onclick="submitExam()">Submit assessment</button>
             </div>
         </div>
 
         <div class="results" id="results" style="display: none;">
-            <div class="score-display">
-                <h2 id="scoreTitle">Exam Complete!</h2>
-                <div id="scorePercentage"></div>
-            </div>
+            <section class="result-hero" id="resultHero">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Assessment complete</span>
+                    <h2 id="scoreTitle">Your results are ready</h2>
+                    <p id="resultSummaryText">Review your performance summary and answer feedback below.</p>
+                </div>
+                <div id="scorePercentage" class="result-score" aria-label="Overall score"></div>
+            </section>
             <div class="score-details">
                 <div class="score-card">
-                    <h3>Total Questions</h3>
+                    <span class="score-card__label">Questions</span>
                     <div class="number" id="totalQuestionsCount"></div>
+                    <span class="score-card__caption">Total presented</span>
                 </div>
                 <div class="score-card">
-                    <h3>Correct Answers</h3>
+                    <span class="score-card__label">Correct</span>
                     <div class="number" id="correctCount">0</div>
+                    <span class="score-card__caption">Accurate responses</span>
                 </div>
                 <div class="score-card">
-                    <h3>Incorrect Answers</h3>
+                    <span class="score-card__label">Needs review</span>
                     <div class="number" id="incorrectCount">0</div>
+                    <span class="score-card__caption">Learning opportunities</span>
                 </div>
                 <div class="score-card">
-                    <h3>Score</h3>
+                    <span class="score-card__label">Overall score</span>
                     <div class="number" id="finalScore">0%</div>
+                    <span class="score-card__caption">Final assessment result</span>
                 </div>
             </div>
-            <div class="question-review" id="questionReview"></div>
-            <button class="restart-button" onclick="backToDashboard()">Back to Dashboard</button>
+            <section class="result-review-section">
+                <header class="result-review-header">
+                    <div>
+                        <span class="result-eyebrow">Detailed feedback</span>
+                        <h3>Question review</h3>
+                        <p>Compare your responses with the expected answers and review the available rationale.</p>
+                    </div>
+                    <div class="review-filters" role="group" aria-label="Filter question review">
+                        <button type="button" class="review-filter review-filter--active" data-review-filter="all" aria-pressed="true" onclick="filterQuestionReview('all', this)">All <span id="reviewAllCount">0</span></button>
+                        <button type="button" class="review-filter" data-review-filter="incorrect" aria-pressed="false" onclick="filterQuestionReview('incorrect', this)">Needs review <span id="reviewIncorrectCount">0</span></button>
+                        <button type="button" class="review-filter" data-review-filter="correct" aria-pressed="false" onclick="filterQuestionReview('correct', this)">Correct <span id="reviewCorrectCount">0</span></button>
+                    </div>
+                </header>
+                <div class="question-review" id="questionReview"></div>
+            </section>
+            <button class="restart-button" onclick="backToDashboard()">Return to dashboard</button>
         </div>
     </div>
 
-    <div id="fullscreenFeedback" style="display: none;">
-        <h2>Training Feedback</h2>
-        <div id="feedbackContent"></div>
-        <button class="btn btn--primary" onclick="closeFeedback()">Close Feedback</button>
+    <div id="fullscreenFeedback" class="training-results" style="display: none;">
+        <div class="training-results__shell">
+            <section class="result-hero result-hero--training">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Training session complete</span>
+                    <h2 id="trainingFeedbackTitle">Practice summary</h2>
+                    <p id="trainingFeedbackSummary">Review each response and use the rationale to reinforce your understanding.</p>
+                </div>
+                <div id="trainingFeedbackScore" class="result-score" aria-label="Training score"></div>
+            </section>
+            <section class="training-review-section">
+                <header class="result-review-header">
+                    <div>
+                        <span class="result-eyebrow">Guided review</span>
+                        <h3>Response analysis</h3>
+                        <p>Review your answers and focus on the concepts that need additional practice.</p>
+                    </div>
+                </header>
+                <div id="feedbackContent" class="training-feedback-list"></div>
+            </section>
+            <button class="restart-button" onclick="closeFeedback()">Return to dashboard</button>
+        </div>
+    </div>
+
+    <div class="session-details-modal" id="sessionDetailsModal" role="dialog" aria-modal="true"
+         aria-labelledby="sessionDetailsTitle" onclick="handleSessionDetailsBackdrop(event)" hidden>
+        <section class="session-details-dialog">
+            <header class="session-details-header">
+                <div>
+                    <p class="session-details-eyebrow">Exam review</p>
+                    <h2 id="sessionDetailsTitle">Session details</h2>
+                    <p id="sessionDetailsMeta" class="session-details-meta"></p>
+                </div>
+                <button type="button" class="session-details-close" id="closeSessionDetailsBtn"
+                        aria-label="Close session details" onclick="closeSessionHistoryDetails()">&times;</button>
+            </header>
+            <div id="sessionDetailsSummary" class="session-details-summary"></div>
+            <div id="sessionDetailsContent" class="session-details-content"></div>
+        </section>
     </div>
 
     <script src="questions.js"></script>

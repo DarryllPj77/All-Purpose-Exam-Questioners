@@ -233,6 +233,10 @@ Return ONLY a JavaScript array (no `const`, no comments, no markdown fences) mat
       D: `Choice D`
     }},
     answer: ["A"],
+    answerDescriptions: {{
+      A: `Explain why choice A is correct using the source material.`
+    }},
+    responseType: `single`,
     maxSelections: 1
   }}
 ]
@@ -240,11 +244,14 @@ Return ONLY a JavaScript array (no `const`, no comments, no markdown fences) mat
 Rules:
 - Multiple-choice ONLY with 4 distinct choices labelled A, B, C, D.
 - `answer` is an array of choice letters, e.g. ["A"] or ["A","C"].
+- `answerDescriptions` contains one clear explanation for EACH correct answer letter and no entries for incorrect choices.
+- Each description explains why its specific answer is correct instead of merely repeating the choice text.
+- `responseType` is `single` for one correct answer, `multiple-response` for select-all-that-apply wording, or `multiple-select` when the question states an exact selection count.
 - `maxSelections` is 1 unless multiple correct answers are clearly required (then equal to the count of correct answers).
-- Use backticks (`) around all string values exactly as shown.
+- Use backticks (`) around text, choice, answer-description, and response-type strings exactly as shown.
 - Each question must be DISTINCT in topic and wording from every other.
 - Number questions sequentially starting at 1 within this array.
-- No explanations, no commentary, no markdown fences — just the array literal.
+- No commentary outside the array and no markdown fences — just the array literal.
 
 Section content:
 {chunk_text}
@@ -382,7 +389,8 @@ _BACKTICK_STR = r"`((?:[^`\\]|\\.)*)`"
 def _block_to_dict(block: str) -> Optional[dict]:
     """Convert one JS question object literal (as produced by the LLM) into a
     Python dict matching the same shape the frontend already consumes:
-        { number, text, choices: {A,B,C,D}, answer: [..], maxSelections }
+        { number, text, choices, answer, answerDescriptions, responseType,
+          maxSelections }
     Returns None if the block is missing required fields."""
     m = re.search(r"\bnumber\s*:\s*(\d+)", block)
     number = int(m.group(1)) if m else None
@@ -391,10 +399,20 @@ def _block_to_dict(block: str) -> Optional[dict]:
     text = m.group(1).strip() if m else None
 
     choices: dict[str, str] = {}
-    for label in ("A", "B", "C", "D"):
-        m = re.search(rf"\b{label}\s*:\s*{_BACKTICK_STR}", block, flags=re.DOTALL)
-        if m:
-            choices[label] = m.group(1).strip()
+    choices_match = re.search(r"\bchoices\s*:\s*\{", block)
+    if choices_match:
+        choices_start = block.find("{", choices_match.start())
+        choices_end = _scan_balanced(block, choices_start, "{", "}")
+        if choices_end != -1:
+            choices_block = block[choices_start + 1 : choices_end]
+            for label in ("A", "B", "C", "D"):
+                choice_match = re.search(
+                    rf"\b{label}\s*:\s*{_BACKTICK_STR}",
+                    choices_block,
+                    flags=re.DOTALL,
+                )
+                if choice_match:
+                    choices[label] = choice_match.group(1).strip()
 
     m = re.search(r"\banswer\s*:\s*\[([^\]]*)\]", block, flags=re.DOTALL)
     answer: list[str] = []
@@ -402,16 +420,48 @@ def _block_to_dict(block: str) -> Optional[dict]:
         for v in re.findall(r"""["']([^"']+)["']""", m.group(1)):
             answer.append(v)
 
+    answer_descriptions: dict[str, str] = {}
+    descriptions_match = re.search(r"\banswerDescriptions\s*:\s*\{", block)
+    if descriptions_match:
+        descriptions_start = block.find("{", descriptions_match.start())
+        descriptions_end = _scan_balanced(block, descriptions_start, "{", "}")
+        if descriptions_end != -1:
+            descriptions_block = block[descriptions_start + 1 : descriptions_end]
+            for label in answer:
+                desc_match = re.search(
+                    rf"\b{re.escape(label)}\s*:\s*{_BACKTICK_STR}",
+                    descriptions_block,
+                    flags=re.DOTALL,
+                )
+                if desc_match:
+                    answer_descriptions[label] = desc_match.group(1).strip()
+
+    response_match = re.search(
+        r"\bresponseType\s*:\s*[`\"'](single|multiple-response|multiple-select)[`\"']",
+        block,
+    )
+    response_type = response_match.group(1) if response_match else (
+        "single" if len(answer) == 1 else "multiple-select"
+    )
+
     m = re.search(r"\bmaxSelections\s*:\s*(\d+)", block)
     max_sel = int(m.group(1)) if m else 1
 
-    if not number or not text or len(choices) != 4 or not answer:
+    if (
+        not number or
+        not text or
+        len(choices) != 4 or
+        not answer or
+        any(not answer_descriptions.get(label) for label in answer)
+    ):
         return None
     return {
         "number": number,
         "text": text,
         "choices": choices,
         "answer": answer,
+        "answerDescriptions": answer_descriptions,
+        "responseType": response_type,
         "maxSelections": max_sel,
     }
 
@@ -430,7 +480,10 @@ def validate_questions_js(code: str) -> None:
     if code.count("{") != code.count("}"):
         raise ValueError("Unbalanced curly braces in generated output.")
 
-    required_keys = ("number", "text", "choices", "answer", "maxSelections")
+    required_keys = (
+        "number", "text", "choices", "answer", "answerDescriptions",
+        "responseType", "maxSelections",
+    )
     missing = [k for k in required_keys if not re.search(rf"\b{k}\s*:", code)]
     if missing:
         raise ValueError(f"Generated output is missing required keys: {missing}")

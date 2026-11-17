@@ -38,12 +38,22 @@ CREATE TABLE IF NOT EXISTS session_history (
     id            BIGSERIAL PRIMARY KEY,
     owner_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     set_id        TEXT REFERENCES question_sets(id) ON DELETE SET NULL,
+    set_title     TEXT,
     mode          TEXT NOT NULL,            -- 'Exam' | 'Training'
     score         INT NOT NULL,             -- percentage 0..100
     correct_count INT NOT NULL,
     total_count   INT NOT NULL,
+    review_data   JSONB,
     finished_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE session_history ADD COLUMN IF NOT EXISTS set_title TEXT;
+ALTER TABLE session_history ADD COLUMN IF NOT EXISTS review_data JSONB;
+UPDATE session_history AS history
+SET set_title = sets.title
+FROM question_sets AS sets
+WHERE history.set_title IS NULL
+  AND history.set_id = sets.id
+  AND history.owner_id = sets.owner_id;
 CREATE INDEX IF NOT EXISTS idx_session_history_owner_finished
     ON session_history(owner_id, finished_at DESC);
 
