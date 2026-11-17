@@ -1410,9 +1410,9 @@ function updateTimerDisplay() {
     
     // Change color when time is running low
     if (timeLeft <= 300) { // 5 minutes
-        timerElement.style.color = '#ffb4a8'; // readable on the teal exam header
+        timerElement.style.color = '#EC9A97'; // calm-theme danger tone
     } else if (timeLeft <= 600) { // 10 minutes
-        timerElement.style.color = '#ffd58a';
+        timerElement.style.color = '#E2BC74';
     } else {
         timerElement.style.color = '';
     }
