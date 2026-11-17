@@ -24,6 +24,18 @@ QSET_ID_RE = re.compile(r"^qs_[A-Za-z0-9_-]{1,64}$")
 MAX_SETS_PER_USER = 200
 MAX_HISTORY_REVIEW_QUESTIONS = 500
 MAX_HISTORY_REVIEW_BYTES = 2_000_000
+HISTORY_MODES = ("Exam", "Training", "Practice")
+CLIENT_ATTEMPT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+MAX_HISTORY_CONFIG_BYTES = 2_000
+MAX_DURATION_SECONDS = 24 * 60 * 60
+
+
+def _history_extras(row: dict[str, Any]) -> dict[str, Any]:
+    """Optional practice-test fields, shared by the list and detail routes."""
+    return {
+        "config": row.get("config"),
+        "durationSeconds": row.get("duration_seconds"),
+    }
 
 
 def _normalize_history_review(value: Any, expected_total: int) -> dict[str, Any] | None:
@@ -344,6 +356,7 @@ def list_history():
         "       COALESCE(history.set_title, sets.title) AS set_title, "
         "       history.mode, history.score, history.correct_count, "
         "       history.total_count, history.finished_at, "
+        "       history.config, history.duration_seconds, "
         "       (history.review_data IS NOT NULL) AS has_details "
         "FROM session_history AS history "
         "LEFT JOIN question_sets AS sets "
@@ -365,6 +378,7 @@ def list_history():
                 "total": r["total_count"],
                 "date": r["finished_at"].isoformat() if r["finished_at"] else None,
                 "hasDetails": bool(r["has_details"]),
+                **_history_extras(r),
             }
             for r in rows
         ],
@@ -377,8 +391,8 @@ def append_history():
     uid = current_user_id()
     payload = request.get_json(silent=True) or {}
     mode = (payload.get("mode") or "").strip()
-    if mode not in ("Exam", "Training"):
-        return jsonify({"ok": False, "error": "mode must be 'Exam' or 'Training'."}), 400
+    if mode not in HISTORY_MODES:
+        return jsonify({"ok": False, "error": "mode must be 'Exam', 'Training' or 'Practice'."}), 400
     score = payload.get("score")
     correct = payload.get("correct")
     total = payload.get("total")
@@ -413,22 +427,52 @@ def append_history():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
 
+    config = payload.get("config")
+    if config is not None:
+        if not isinstance(config, dict):
+            return jsonify({"ok": False, "error": "config must be an object."}), 400
+        if len(json.dumps(config).encode("utf-8")) > MAX_HISTORY_CONFIG_BYTES:
+            return jsonify({"ok": False, "error": "config is too large."}), 400
+    duration = payload.get("durationSeconds")
+    if duration is not None:
+        if not isinstance(duration, (int, float)) or not 0 <= duration <= MAX_DURATION_SECONDS:
+            return jsonify({"ok": False, "error": "durationSeconds is out of range."}), 400
+        duration = int(duration)
+    client_attempt_id = payload.get("clientAttemptId")
+    if client_attempt_id is not None and (
+        not isinstance(client_attempt_id, str) or not CLIENT_ATTEMPT_ID_RE.match(client_attempt_id)
+    ):
+        return jsonify({"ok": False, "error": "Malformed clientAttemptId."}), 400
+
+    # A retried or repeated submit with the same clientAttemptId never
+    # creates a second row: the original entry is returned instead.
     row = fetch_one(
         "INSERT INTO session_history "
-        "(owner_id, set_id, set_title, mode, score, correct_count, total_count, review_data) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
-        "RETURNING id, finished_at",
+        "(owner_id, set_id, set_title, mode, score, correct_count, total_count, review_data, "
+        " config, duration_seconds, client_attempt_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+        "ON CONFLICT (owner_id, client_attempt_id) WHERE client_attempt_id IS NOT NULL DO NOTHING "
+        "RETURNING id, set_id, set_title, finished_at, review_data IS NOT NULL AS has_details",
         (uid, set_id, set_title, mode, score_int, correct_int, total_int,
-         Json(review) if review is not None else None),
+         Json(review) if review is not None else None,
+         Json(config) if config is not None else None, duration, client_attempt_id),
     )
+    duplicate = row is None
+    if duplicate:
+        row = fetch_one(
+            "SELECT id, set_id, set_title, finished_at, review_data IS NOT NULL AS has_details "
+            "FROM session_history WHERE owner_id = %s AND client_attempt_id = %s",
+            (uid, client_attempt_id),
+        )
     return jsonify({
         "ok": True,
+        "duplicate": duplicate,
         "entry": {
             "id": row["id"],
-            "setId": set_id,
-            "setTitle": set_title,
+            "setId": row["set_id"],
+            "setTitle": row["set_title"],
             "date": row["finished_at"].isoformat(),
-            "hasDetails": review is not None,
+            "hasDetails": bool(row["has_details"]),
         },
     })
 
@@ -439,7 +483,7 @@ def get_history_details(history_id: int):
     uid = current_user_id()
     row = fetch_one(
         "SELECT id, set_id, set_title, mode, score, correct_count, total_count, "
-        "       finished_at, review_data "
+        "       finished_at, review_data, config, duration_seconds "
         "FROM session_history WHERE id = %s AND owner_id = %s",
         (history_id, uid),
     )
@@ -458,6 +502,7 @@ def get_history_details(history_id: int):
             "total": row["total_count"],
             "date": row["finished_at"].isoformat() if row["finished_at"] else None,
             "review": row["review_data"],
+            **_history_extras(row),
         },
     })
 

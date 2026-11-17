@@ -10,8 +10,8 @@ only what is implemented and verified; planned work is listed separately.
 | 0 | Repository audit and plan | Done |
 | 0.5 | Static files restricted to an allow-list (`.env`, source and `.git` were public) | Committed (`9d39483`) |
 | 1 | Foundation: question ids, progress data model and API, shared JS core, scoped sessions, tests | Committed (`b6a9e2e`) |
-| 2 | Flashcards | Committed |
-| 3 | Practice test | Planned |
+| 2 | Flashcards | Committed (`a98df25`) |
+| 3 | Practice test; exam and training answers logged | Committed |
 | 4 | Mistake review | Planned |
 | 5 | Learn mode | Planned |
 | 6 | Active recall | Planned |
@@ -32,7 +32,7 @@ only what is implemented and verified; planned work is listed separately.
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
-  study mode in `js/modes/` (currently `flashcards.js`).
+  study mode in `js/modes/` (`flashcards.js`, `practice.js`).
 * **Study mode views:** each mode is a full-page view inside the app shell,
   opened from a tile in the dashboard's "Study modes" section or from the
   sidebar. Opening a view hides the dashboard; any sidebar link closes it.
@@ -106,6 +106,48 @@ These are starting defaults, not proven-optimal values.
   side; no external service. The button is hidden where it is unsupported.
 * **Reduced motion:** the faces swap without the 3D turn.
 
+## Practice test (Phase 3)
+
+* **Setup:** question count (capped to the questions that match the chosen
+  types), one-answer and several-answer question types, optional timer
+  (1–300 minutes), pass mark (1–100%), shuffle questions (on by default),
+  shuffle answer choices (off by default, because it breaks "All of the
+  above" options), feedback after submitting or after each question, and
+  free or forward-only navigation. Each invalid field gets its own message.
+  Difficulty is not offered: questions have no difficulty field yet.
+* **During the test:** question number, progress bar, numbered navigator
+  (display-only in forward-only mode), live timer with 5-minute and
+  1-minute warnings, unanswered questions allowed, submit at any time with a
+  confirmation that names the unanswered count, letter keys A–D to choose.
+* **Scoring:** the shared grading rule; partial multi-answer selections are
+  incorrect; unanswered questions are reported separately and count as not
+  correct. Pass/fail compares the exact ratio, so 69.6% never passes a 70%
+  mark even though it displays as 70%.
+* **Timer:** decides only when the test ends. On expiry, or when the deadline
+  passed while the page was closed, the saved answers are submitted; time
+  spent is capped at the limit. The deadline is a wall-clock time, so a
+  refresh never resets the clock.
+* **No duplicates:** each test has one `attemptId`. The result is saved as
+  "submitted" before anything is sent, so a refresh shows the results
+  instead of running the test again. The history entry uses it as
+  `clientAttemptId` (the server returns the original row on a repeat) and
+  each answer-log row uses `attemptId_<n>`. A failed save shows a retry
+  button and is retried automatically on the next open.
+* **Saved test integrity:** a saved test is resumed only if every question
+  still exists with the same choices; otherwise it is cleared rather than
+  scored against changed questions.
+* **Results:** pass or fail, score ring, totals for correct, incorrect and
+  unanswered, time spent against the limit, and a filterable review of every
+  question with the correct answer and explanation. History records mode
+  `Practice` with the settings and duration.
+
+## Exam and training answers
+
+On submit, Exam and Training now write one answer-log row per question
+(`correct`, `incorrect`, or `skipped` when unanswered). Only questions from a
+saved set are logged; the built-in demo bank has no ids. Logging is
+fire-and-forget and never affects the score or the results screen.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -131,6 +173,7 @@ shared key is handed to the first account that signs in, then removed.
 | GET | `/api/progress/<setId>/attempts` | Answer history (`questionId`, `mode`, `limit` filters) |
 | GET / PUT / DELETE | `/api/study-sessions/<setId>/<mode>` | Resumable state (200 KB max) |
 | PUT | `/api/progress/<setId>/flashcards/<questionId>` | Set or clear a flashcard label (`know`, `learning`, `null`) |
+| POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests
 
@@ -146,5 +189,5 @@ and delete them afterwards. They are skipped if no database is reachable.
 
 * Questions are multiple choice only; written answers, code and difficulty or
   topic fields are planned as optional additions in later phases.
-* The existing exam and training modes do not record attempts yet; Phase 3
-  connects them.
+* Practice tests have no difficulty filter because questions carry no
+  difficulty field.

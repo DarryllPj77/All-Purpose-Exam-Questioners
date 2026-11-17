@@ -111,6 +111,7 @@ def index():
 PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
     "js/core/learning.js", "js/shell.js", "js/modes/flashcards.js",
+    "js/modes/practice.js",
 })
 
 

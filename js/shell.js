@@ -9,6 +9,21 @@ function isExamVisible() {
     return !!exam && exam.style.display !== 'none';
 }
 
+const MODE_VIEWS = [
+    { key: 'flashcards', label: 'Flashcards' },
+    { key: 'practice', label: 'Practice test' },
+];
+
+/** The study-mode view that is open, as { key, label, ctl }, or null. */
+function openModeView() {
+    if (!window.Quizer) return null;
+    for (const view of MODE_VIEWS) {
+        const ctl = Quizer[view.key];
+        if (ctl && ctl.isOpen()) return Object.assign({ ctl }, view);
+    }
+    return null;
+}
+
 function isFlashcardsOpen() {
     return !!(window.Quizer && Quizer.flashcards && Quizer.flashcards.isOpen());
 }
@@ -32,9 +47,10 @@ function syncAppBar() {
     const eyebrow = document.getElementById('appBarEyebrow');
     const title = document.getElementById('appBarTitle');
     if (!eyebrow || !title) return;
-    if (isFlashcardsOpen()) {
-        eyebrow.textContent = 'Flashcards';
-        title.textContent = Quizer.flashcards.title() || activeQuestionSetTitle();
+    const modeView = openModeView();
+    if (modeView) {
+        eyebrow.textContent = modeView.label;
+        title.textContent = modeView.ctl.title() || activeQuestionSetTitle();
     } else if (isResultsVisible()) {
         eyebrow.textContent = isTrainingMode ? 'Training results' : 'Exam results';
         title.textContent = activeQuestionSetTitle();
@@ -149,7 +165,8 @@ function setActiveNav(target) {
 function navigateToSection(target) {
     // Leaving a live session keeps it resumable (same as "Save and exit").
     if (isExamVisible()) backToDashboard();
-    if (isFlashcardsOpen()) Quizer.flashcards.close();
+    const modeView = openModeView();
+    if (modeView) modeView.ctl.close();
     const feedback = document.getElementById('fullscreenFeedback');
     if (feedback && feedback.style.display !== 'none') closeFeedback();
     setActiveNav(target);
@@ -167,7 +184,7 @@ function watchSectionsForNav() {
     const visible = new Map();
     const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0));
-        if (isExamVisible() || isFlashcardsOpen()) return;
+        if (isExamVisible() || openModeView()) return;
         if (window.scrollY < 80) { setActiveNav('dashboard'); return; }
         let best = null; let bestRatio = 0;
         ids.forEach((id) => { const r = visible.get(id) || 0; if (r > bestRatio) { best = id; bestRatio = r; } });

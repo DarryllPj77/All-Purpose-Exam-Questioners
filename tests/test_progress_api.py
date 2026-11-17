@@ -162,6 +162,55 @@ class ProgressApiTest(unittest.TestCase):
         self.assertEqual(self.flashcard(self.alice, "q_notinthisset", "know").status_code, 400)
         self.assertEqual(self.flashcard(self.bob, self.qids[0], "know").status_code, 404)
 
+    # ---- practice results in history -----------------------------------------
+
+    def practice_result(self, **overrides):
+        body = {
+            "mode": "Practice", "setId": self.set_id, "score": 50, "correct": 1, "total": 2,
+            "config": {"count": 2, "passPercent": 70, "timerMinutes": None},
+            "durationSeconds": 95, "clientAttemptId": "p_" + secrets.token_hex(8),
+        }
+        body.update(overrides)
+        return body
+
+    def test_practice_result_is_saved_with_settings_and_time(self):
+        res = self.alice.post("/api/history", json=self.practice_result())
+        self.assertEqual(res.status_code, 200, res.get_json())
+        self.assertFalse(res.get_json()["duplicate"])
+        entry = self.alice.get("/api/history").get_json()["history"][0]
+        self.assertEqual(entry["mode"], "Practice")
+        self.assertEqual(entry["durationSeconds"], 95)
+        self.assertEqual(entry["config"]["passPercent"], 70)
+
+    def test_same_attempt_id_never_creates_a_second_row(self):
+        body = self.practice_result()
+        first = self.alice.post("/api/history", json=body).get_json()
+        again = self.alice.post("/api/history", json=body).get_json()
+        self.assertTrue(again["duplicate"])
+        self.assertEqual(first["entry"]["id"], again["entry"]["id"])
+        rows = [h for h in self.alice.get("/api/history").get_json()["history"] if h["mode"] == "Practice"]
+        self.assertEqual(len(rows), 1)
+
+    def test_attempt_ids_are_per_user(self):
+        shared = "p_" + secrets.token_hex(8)
+        self.alice.post("/api/history", json=self.practice_result(clientAttemptId=shared))
+        bob_set = self.bob.post("/api/sets", json={"title": "b", "questions": questions()}).get_json()["set"]["id"]
+        res = self.bob.post("/api/history", json=self.practice_result(setId=bob_set, clientAttemptId=shared))
+        self.assertFalse(res.get_json()["duplicate"])
+
+    def test_practice_result_validation(self):
+        for bad in ({"mode": "Cheat"}, {"config": [1]}, {"config": {"x": "y" * 3000}},
+                    {"durationSeconds": -1}, {"durationSeconds": 10 ** 7}, {"clientAttemptId": "bad id!"}):
+            res = self.alice.post("/api/history", json=self.practice_result(**bad))
+            self.assertEqual(res.status_code, 400, bad)
+
+    def test_exam_history_still_works_without_new_fields(self):
+        res = self.alice.post("/api/history", json={
+            "mode": "Exam", "setId": self.set_id, "score": 100, "correct": 2, "total": 2})
+        self.assertEqual(res.status_code, 200, res.get_json())
+        entry = self.alice.get("/api/history").get_json()["history"][0]
+        self.assertIsNone(entry["durationSeconds"])
+
     # ---- study sessions -------------------------------------------------------
 
     def test_study_session_round_trip(self):
@@ -199,7 +248,7 @@ class StaticFilesTest(unittest.TestCase):
     def test_only_app_files_are_served(self):
         client = server.app.test_client()
         for path in ("/", "/Cert.css", "/Cert.js", "/questions.js", "/js/core/learning.js", "/js/shell.js",
-                     "/js/modes/flashcards.js"):
+                     "/js/modes/flashcards.js", "/js/modes/practice.js"):
             with client.get(path) as res:
                 self.assertEqual(res.status_code, 200, path)
         for path in ("/.env", "/server.py", "/schema.sql", "/.git/config", "/learning_config.py",

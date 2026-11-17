@@ -1701,6 +1701,36 @@ function clearSessionHistory() {
 
 // --- Hook into exam/training completion ---
 
+// Log one answer per question to the shared answer history (Mistake Review,
+// Smart Review and analytics read it). Only questions from a saved set have
+// ids; the built-in demo bank is not logged. Fire-and-forget: a failure here
+// never affects the score or the results screen.
+function recordSessionAttempts(mode) {
+    try {
+        const setId = QSetStore.getActiveId();
+        if (!setId || typeof questions === 'undefined' || !questions.length) return;
+        if (!questions.every((q) => q && typeof q.id === 'string')) return;
+        const base = Quizer.learning.newClientId(mode === 'training' ? 't' : 'e');
+        const attempts = questions.map((question, index) => {
+            const selected = normalizeAnswerList(userAnswers[index]);
+            return {
+                questionId: question.id,
+                mode,
+                outcome: !selected.length ? 'skipped'
+                    : (isQuestionResponseCorrect(question, index) ? 'correct' : 'incorrect'),
+                response: { selected },
+                clientAttemptId: `${base}_${index}`,
+            };
+        });
+        for (let i = 0; i < attempts.length; i += 200) {
+            Quizer.learning.api.recordAttempts(setId, attempts.slice(i, i + 200))
+                .catch((e) => console.warn('[attempts] could not log answers:', e.message));
+        }
+    } catch (e) {
+        console.warn('[attempts] skipped:', e.message);
+    }
+}
+
 function submitExam() {
     clearInterval(timerInterval);
     calculateScore();
@@ -1725,6 +1755,8 @@ function submitExam() {
         const activeSetId = QSetStore.getActiveId();
         if (activeSetId) QSetStore.updateStats(activeSetId, percentage);
     } catch (_) { /* localStorage may be disabled */ }
+
+    recordSessionAttempts(isTrainingMode ? 'training' : 'exam');
 
     if (isTrainingMode) {
         showFullscreenFeedback();

@@ -67,6 +67,20 @@ MISTAKES: dict[str, Any] = {
 }
 
 
+# Practice tests: defaults and limits for the setup form.
+PRACTICE: dict[str, Any] = {
+    "default_question_count": 20,
+    "max_question_count": 200,
+    "default_pass_percent": 70,
+    "default_minutes": 30,
+    "max_minutes": 300,
+    # Shuffling answer choices breaks "All of the above" style options,
+    # so it starts off and the learner opts in.
+    "shuffle_questions_by_default": True,
+    "shuffle_answers_by_default": False,
+}
+
+
 def public_config() -> dict[str, Any]:
     """Everything the browser needs, as plain JSON."""
     return {
@@ -90,5 +104,14 @@ def public_config() -> dict[str, Any]:
         },
         "mistakes": {
             "correctRetriesToResolve": MISTAKES["correct_retries_to_resolve"],
+        },
+        "practice": {
+            "defaultQuestionCount": PRACTICE["default_question_count"],
+            "maxQuestionCount": PRACTICE["max_question_count"],
+            "defaultPassPercent": PRACTICE["default_pass_percent"],
+            "defaultMinutes": PRACTICE["default_minutes"],
+            "maxMinutes": PRACTICE["max_minutes"],
+            "shuffleQuestionsByDefault": PRACTICE["shuffle_questions_by_default"],
+            "shuffleAnswersByDefault": PRACTICE["shuffle_answers_by_default"],
         },
     }
