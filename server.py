@@ -23,6 +23,9 @@ Routes:
   GET  /api/progress/<setId>           → per-question learning progress
   GET/POST /api/progress/<setId>/attempts → answer history (append-only)
   GET/PUT/DELETE /api/study-sessions/<setId>/<mode> → resumable mode state
+  GET  /api/mistakes                   → questions answered wrong (open and resolved)
+  POST /api/mistakes/<setId>/<qId>/retry → grade a retry on the server
+  POST /api/mistakes/reset             → close review items (history is kept)
 
   POST /api/analyze                    → PDF analysis (login required)
   POST /api/generate                   → submit generation job (login required)
@@ -60,6 +63,7 @@ from billing import increment_usage, plan_limits, usage_summary
 from auth import bp as auth_bp, current_user_id, login_required
 from data_routes import bp as data_bp, _new_set_id
 from progress_routes import bp as progress_bp
+from mistakes_routes import bp as mistakes_bp
 from db import cursor, execute, fetch_one, init_schema
 
 # Load .env before reading any env var.
@@ -85,6 +89,7 @@ except Exception as e:  # noqa: BLE001 — surface early on misconfig
 app.register_blueprint(auth_bp)
 app.register_blueprint(data_bp)
 app.register_blueprint(progress_bp)
+app.register_blueprint(mistakes_bp)
 
 
 @app.after_request
@@ -111,7 +116,7 @@ def index():
 PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
     "js/core/learning.js", "js/shell.js", "js/modes/flashcards.js",
-    "js/modes/practice.js",
+    "js/modes/practice.js", "js/modes/mistakes.js",
 })
 
 

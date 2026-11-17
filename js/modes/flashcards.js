@@ -198,13 +198,7 @@
 
     // -- view switching --
     function showOnly(view) {
-        const dashboard = $('dashboard');
-        const exam = $('examContainer');
-        if (dashboard) dashboard.style.display = view === 'dashboard' ? 'block' : 'none';
-        if (exam && view !== 'exam') exam.style.display = 'none';
-        $('flashcardsView').hidden = view !== 'flashcards';
-        const practice = $('practiceView');
-        if (practice && view !== 'practice') practice.hidden = true;
+        root.showModeView(view === 'flashcards' ? 'flashcardsView' : null);
     }
 
     // Loading, error and "no set" states replace the whole deck.
@@ -472,7 +466,7 @@
 
     // -- open / close --
     async function open() {
-        if (root.Quizer.practice && root.Quizer.practice.isOpen()) root.Quizer.practice.close();
+        if (typeof root.closeModeViews === 'function') root.closeModeViews('flashcards');
         const setId = activeSetId();
         s.open = true;
         showOnly('flashcards');

@@ -106,6 +106,20 @@
                 method: 'POST', body: { attempts: withIds },
             });
         },
+        /** Mistakes (open and resolved) with question content; setId optional. */
+        listMistakes(setId) {
+            return request('/api/mistakes' + (setId ? '?setId=' + enc(setId) : ''));
+        },
+        /** Graded on the server; clientAttemptId makes a resend harmless. */
+        retryMistake(setId, questionId, selected, clientAttemptId) {
+            return request('/api/mistakes/' + enc(setId) + '/' + enc(questionId) + '/retry', {
+                method: 'POST', body: { selected, clientAttemptId: clientAttemptId || newClientId('m') },
+            });
+        },
+        /** Close review items (history is kept). scope: { setId?, questionId? } */
+        resetMistakes(scope) {
+            return request('/api/mistakes/reset', { method: 'POST', body: scope || {} });
+        },
         listAttempts(setId, filters) {
             const f = filters || {};
             const qs = ['questionId', 'mode', 'limit']

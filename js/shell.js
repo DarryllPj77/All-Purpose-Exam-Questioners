@@ -12,7 +12,26 @@ function isExamVisible() {
 const MODE_VIEWS = [
     { key: 'flashcards', label: 'Flashcards' },
     { key: 'practice', label: 'Practice test' },
+    { key: 'mistakes', label: 'Mistake review' },
 ];
+
+/** Close every open study-mode view except `exceptKey` (each saves its own state). */
+function closeModeViews(exceptKey) {
+    if (!window.Quizer) return;
+    MODE_VIEWS.forEach((view) => {
+        const ctl = Quizer[view.key];
+        if (view.key !== exceptKey && ctl && ctl.isOpen()) ctl.close();
+    });
+}
+
+/** Show one study-mode view (by element id), or the dashboard when null. */
+function showModeView(viewId) {
+    const dashboard = document.getElementById('dashboard');
+    const exam = document.getElementById('examContainer');
+    if (dashboard) dashboard.style.display = viewId ? 'none' : 'block';
+    if (exam && viewId) exam.style.display = 'none';
+    document.querySelectorAll('.mode-view').forEach((el) => { el.hidden = el.id !== viewId; });
+}
 
 /** The study-mode view that is open, as { key, label, ctl }, or null. */
 function openModeView() {

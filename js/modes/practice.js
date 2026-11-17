@@ -271,13 +271,7 @@
 
     // -- view switching --
     function showOnly(view) {
-        const dashboard = $('dashboard');
-        const exam = $('examContainer');
-        if (dashboard) dashboard.style.display = view === 'dashboard' ? 'block' : 'none';
-        if (exam && view !== 'exam') exam.style.display = 'none';
-        const fc = $('flashcardsView');
-        if (fc && view !== 'flashcards') fc.hidden = true;
-        $('practiceView').hidden = view !== 'practice';
+        root.showModeView(view === 'practice' ? 'practiceView' : null);
     }
 
     function showScreen(name) {
@@ -829,7 +823,7 @@
 
     // ================= Open / close =================
     async function open() {
-        if (root.Quizer.flashcards && root.Quizer.flashcards.isOpen()) root.Quizer.flashcards.close();
+        if (typeof root.closeModeViews === 'function') root.closeModeViews('practice');
         s.open = true;
         showOnly('practice');
         if (typeof root.toggleSidebar === 'function') root.toggleSidebar(false);

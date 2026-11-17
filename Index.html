@@ -63,6 +63,7 @@
                 <a class="side-nav__link" href="#importCard" data-nav-target="importCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg><span>Import a set</span></a>
                 <a class="side-nav__link" href="#flashcards" data-nav-target="flashcardsView" data-open-view="flashcards"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg><span>Flashcards</span></a>
                 <a class="side-nav__link" href="#practice" data-nav-target="practiceView" data-open-view="practice"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="m9 13 1.5 1.5L14 11"/></svg><span>Practice test</span></a>
+                <a class="side-nav__link" href="#mistakes" data-nav-target="mistakesView" data-open-view="mistakes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span>Mistake review</span></a>
                 <p class="side-nav__label">Your data</p>
                 <a class="side-nav__link" href="#questionSetsSection" data-nav-target="questionSetsSection"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v15H6a2 2 0 0 0-2 2z"/><path d="M6 21h12"/><path d="M8 7h6"/></svg><span>Question library</span></a>
                 <a class="side-nav__link" href="#sessionHistory" data-nav-target="sessionHistory"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg><span>Performance history</span></a>
@@ -272,6 +273,15 @@
                         <span class="mode-tile__title">Practice test</span>
                         <span class="mode-tile__desc">Set the length, timer and pass mark, then take the test under exam conditions and review every answer.</span>
                         <span class="mode-tile__meta" id="ptTileMeta">Uses your active question set</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
+                <button type="button" class="mode-tile" data-open-view="mistakes">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Mistake review</span>
+                        <span class="mode-tile__desc">Retry the questions you got wrong in any set until you get them right twice in a row.</span>
+                        <span class="mode-tile__meta" id="mrTileMeta">Questions you miss land here</span>
                     </span>
                     <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
                 </button>
@@ -658,6 +668,100 @@
         </div>
         <p class="sr-only" id="ptLive" aria-live="polite"></p>
     </section>
+
+    <section class="mode-view" id="mistakesView" aria-labelledby="mrTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Mistake review</span>
+                <h1 id="mrTitle">Questions you missed</h1>
+                <p class="mode-head__meta" id="mrRule"></p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--secondary btn--sm" id="mrExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="mrState" role="status" hidden></div>
+
+        <!-- Overview -->
+        <div class="mr-list" id="mrList" hidden>
+            <div class="mr-toolbar">
+                <div class="mr-field">
+                    <label class="field-label" for="mrSet">Question set</label>
+                    <select class="text-input mr-select" id="mrSet"></select>
+                </div>
+                <div class="review-filters" role="group" aria-label="Show">
+                    <button type="button" class="review-filter review-filter--active" data-mr-tab="open" aria-pressed="true">To review <span>0</span></button>
+                    <button type="button" class="review-filter" data-mr-tab="resolved" aria-pressed="false">Resolved <span>0</span></button>
+                </div>
+            </div>
+
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">To review</span><div class="number" id="mrStatOpen">0</div><span class="score-card__caption">Still being missed</span></div>
+                <div class="score-card"><span class="score-card__label">Resolved</span><div class="number" id="mrStatResolved">0</div><span class="score-card__caption">History kept</span></div>
+                <div class="score-card"><span class="score-card__label">Retry accuracy</span><div class="number" id="mrStatAccuracy">&mdash;</div><span class="score-card__caption" id="mrStatAccuracyNote">No retries yet</span></div>
+            </div>
+
+            <div class="mr-actions">
+                <button type="button" class="btn btn--primary" id="mrStart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span id="mrStartLabel">Review questions</span></button>
+                <button type="button" class="btn btn--ghost-danger" id="mrReset">Clear from review&hellip;</button>
+            </div>
+            <p class="pt-hint" id="mrUnavailable" hidden></p>
+
+            <div class="mr-items" id="mrItems"></div>
+        </div>
+
+        <!-- Retry session -->
+        <div class="mr-session" id="mrSession" hidden>
+            <div class="pt-runhead">
+                <div class="pt-runhead__row">
+                    <span class="pt-runhead__label" id="mrPos">Question 1</span>
+                    <span class="pt-type" id="mrStreakNow"></span>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="Review progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="mrFill"></div>
+                </div>
+            </div>
+            <div class="question-card">
+                <div class="question-header">
+                    <div class="question-number" id="mrSetTag"></div>
+                    <span class="pt-type" id="mrNumber"></span>
+                </div>
+                <div class="question-text" id="mrText"></div>
+            </div>
+            <div class="answers-card">
+                <div class="choices" id="mrChoices"></div>
+                <div class="pt-feedback" id="mrFeedback" role="status" hidden></div>
+            </div>
+            <div class="navigation">
+                <button type="button" class="nav-button nav-button--secondary" id="mrExitSession">Stop review</button>
+                <button type="button" class="nav-button" id="mrCheck">Check answer</button>
+                <button type="button" class="nav-button" id="mrNext" hidden>Next question</button>
+            </div>
+            <p class="pt-keys">Keys: <kbd>A</kbd>&ndash;<kbd>D</kbd> choose, <kbd>Enter</kbd> check and continue.</p>
+        </div>
+
+        <!-- Finished -->
+        <div class="mr-done" id="mrDone" hidden>
+            <section class="result-hero" data-tone="passed">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Review finished</span>
+                    <h2 id="mrDoneHeading" tabindex="-1">Round complete</h2>
+                    <p id="mrDoneText"></p>
+                </div>
+            </section>
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">Retried</span><div class="number" id="mrDoneDone">0</div><span class="score-card__caption">This round</span></div>
+                <div class="score-card"><span class="score-card__label">Correct</span><div class="number" id="mrDoneCorrect">0</div><span class="score-card__caption">Fully right</span></div>
+                <div class="score-card"><span class="score-card__label">Resolved</span><div class="number" id="mrDoneResolved">0</div><span class="score-card__caption">Left the list</span></div>
+            </div>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="mrBackToList">Back to mistakes</button>
+                <button type="button" class="btn btn--ghost" id="mrDoneDashboard">Back to dashboard</button>
+            </div>
+        </div>
+        <p class="sr-only" id="mrLive" aria-live="polite"></p>
+    </section>
         </div>
     </div>
 
@@ -708,5 +812,6 @@
     <script src="js/shell.js"></script>
     <script src="js/modes/flashcards.js"></script>
     <script src="js/modes/practice.js"></script>
+    <script src="js/modes/mistakes.js"></script>
 </body>
 </html>

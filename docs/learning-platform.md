@@ -11,8 +11,8 @@ only what is implemented and verified; planned work is listed separately.
 | 0.5 | Static files restricted to an allow-list (`.env`, source and `.git` were public) | Committed (`9d39483`) |
 | 1 | Foundation: question ids, progress data model and API, shared JS core, scoped sessions, tests | Committed (`b6a9e2e`) |
 | 2 | Flashcards | Committed (`a98df25`) |
-| 3 | Practice test; exam and training answers logged | Committed |
-| 4 | Mistake review | Planned |
+| 3 | Practice test; exam and training answers logged | Committed (`dd19277`) |
+| 4 | Mistake review | Committed |
 | 5 | Learn mode | Planned |
 | 6 | Active recall | Planned |
 | 7 | Smart review (spaced repetition) | Planned |
@@ -32,10 +32,12 @@ only what is implemented and verified; planned work is listed separately.
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
-  study mode in `js/modes/` (`flashcards.js`, `practice.js`).
-* **Study mode views:** each mode is a full-page view inside the app shell,
-  opened from a tile in the dashboard's "Study modes" section or from the
-  sidebar. Opening a view hides the dashboard; any sidebar link closes it.
+  study mode in `js/modes/` (`flashcards.js`, `practice.js`, `mistakes.js`).
+* **Study mode views:** each mode is a full-page `.mode-view` inside the app
+  shell, opened from a tile in the dashboard's "Study modes" section or from
+  the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
+  calls `closeModeViews(key)` so only one is ever open, and `showModeView()`
+  swaps it in for the dashboard. Any sidebar link closes an open mode.
 * **Static files:** only the files listed in `PUBLIC_FILES` in `server.py`
   are served. Add new front-end files there.
 
@@ -148,6 +150,36 @@ On submit, Exam and Training now write one answer-log row per question
 saved set are logged; the built-in demo bank has no ids. Logging is
 fire-and-forget and never affects the score or the results screen.
 
+## Mistake review (Phase 4)
+
+* **Source of truth:** the answer log. A question is open for review when it
+  has an `incorrect` answer from any mode other than Mistake Review that is
+  newer than its last review change. This is reconciled on every read, so
+  mistakes made before this phase are included and nothing is duplicated
+  (one `question_progress` row per question). `skipped` (unanswered) and
+  `revealed` answers are not mistakes; a partial multi-answer pick is.
+* **Retries are graded on the server** against the stored answer and logged
+  with mode `mistakes`. Correct retries build a streak; the question is
+  resolved after `MISTAKES["correct_retries_to_resolve"]` (2) in a row. A
+  wrong or partial retry resets the streak. A new mistake in any mode
+  reopens a resolved question. A resent retry (same `clientAttemptId`) is
+  not counted twice.
+* **History is never deleted.** "Clear from review" (with confirmation, for
+  all sets or the selected set) only closes items; a cleared question comes
+  back the next time it is answered wrong. Deleting a set still deletes its
+  data, as everywhere else.
+* **Screen:** filter by set, To review / Resolved tabs, totals and retry
+  accuracy, each question's miss count, last mode and date, and a streak
+  indicator. Review runs over every open question (most missed first) or a
+  single one from its Retry button, with the correct answer and explanation
+  after each check. Questions edited or removed from their set are hidden
+  and counted in a note; their history stays.
+* **Not resumable by design:** each retry is saved the moment it is checked,
+  so stopping mid-round loses nothing; a new round starts from the current
+  list.
+* **Topic filter:** not available, because questions carry no topic field;
+  filtering is by set.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -173,6 +205,9 @@ shared key is handed to the first account that signs in, then removed.
 | GET | `/api/progress/<setId>/attempts` | Answer history (`questionId`, `mode`, `limit` filters) |
 | GET / PUT / DELETE | `/api/study-sessions/<setId>/<mode>` | Resumable state (200 KB max) |
 | PUT | `/api/progress/<setId>/flashcards/<questionId>` | Set or clear a flashcard label (`know`, `learning`, `null`) |
+| GET | `/api/mistakes` | Mistakes with question content, stats, summary and per-set counts (`setId` filter) |
+| POST | `/api/mistakes/<setId>/<questionId>/retry` | Grade a retry on the server (`selected`, `clientAttemptId`) |
+| POST | `/api/mistakes/reset` | Close open items for all sets, one set or one question; history is kept |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests
