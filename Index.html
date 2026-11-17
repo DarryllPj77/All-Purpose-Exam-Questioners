@@ -49,15 +49,44 @@
         </section>
     </div>
 
+    <div class="app-shell">
+        <aside class="sidebar" id="appSidebar" aria-label="Main navigation">
+            <div class="sidebar__head">
+                <span class="brand"><span class="brand__mark" aria-hidden="true">Q</span><span class="brand__name">Exam Review Suite</span></span>
+                <button type="button" class="icon-btn sidebar__close" onclick="toggleSidebar(false)" aria-label="Close navigation"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg></button>
+            </div>
+            <nav class="side-nav">
+                <p class="side-nav__label">Workspace</p>
+                <a class="side-nav__link is-active" href="#dashboard" data-nav-target="dashboard" aria-current="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Dashboard</span></a>
+                <a class="side-nav__link" href="#studyCard" data-nav-target="studyCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span>Study session</span></a>
+                <a class="side-nav__link" href="#generateCard" data-nav-target="generateCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Generate from PDF</span></a>
+                <a class="side-nav__link" href="#importCard" data-nav-target="importCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg><span>Import a set</span></a>
+                <p class="side-nav__label">Your data</p>
+                <a class="side-nav__link" href="#questionSetsSection" data-nav-target="questionSetsSection"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v15H6a2 2 0 0 0-2 2z"/><path d="M6 21h12"/><path d="M8 7h6"/></svg><span>Question library</span></a>
+                <a class="side-nav__link" href="#sessionHistory" data-nav-target="sessionHistory"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg><span>Performance history</span></a>
+            </nav>
+            <div class="sidebar__foot">
+                <a class="side-nav__link" href="https://github.com/DarryllPj77" target="_blank" rel="noopener"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg><span>Built by DarryllPj77</span></a>
+                <button type="button" class="side-nav__link side-nav__link--danger" onclick="signOut()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg><span>Sign out</span></button>
+            </div>
+        </aside>
+        <div class="sidebar-scrim" id="sidebarScrim" onclick="toggleSidebar(false)" hidden></div>
+
+        <div class="app-main">
     <header class="app-bar">
         <div class="app-bar__inner">
-            <span class="brand"><span class="brand__mark" aria-hidden="true">Q</span><span class="brand__name">Exam Review Suite</span></span>
-    <!-- Signed-in user pill — populated by Cert.js once /api/auth/me succeeds. -->
+            <div class="app-bar__lead">
+                <button type="button" class="icon-btn app-bar__menu" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Open navigation" aria-controls="appSidebar" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+                <div class="app-bar__titles">
+                    <span class="app-bar__eyebrow" id="appBarEyebrow">Workspace</span>
+                    <span class="app-bar__title" id="appBarTitle">Dashboard</span>
+                </div>
+            </div>
+    <!-- Signed-in user pill, populated by Cert.js once /api/auth/me succeeds. -->
     <div id="userPill" class="user-pill" style="display: none;">
         <span class="user-pill__avatar" aria-hidden="true"></span>
         <span class="user-pill__name" id="userPillName"></span>
         <span class="user-pill__usage" id="userPlanUsage" style="display: none;"></span>
-        <button type="button" class="user-pill__signout" onclick="signOut()" title="Sign out">Sign out</button>
     </div>
         </div>
     </header>
@@ -70,7 +99,7 @@
         </section>
 
         <section class="dashboard-grid">
-            <article class="card card--actions">
+            <article class="card card--actions" id="studyCard">
                 <header class="card-head">
                     <h2>Begin a study session</h2>
                     <p>Select the experience that best supports your current learning goal.</p>
@@ -116,7 +145,7 @@
                 </div>
             </article>
 
-            <article class="card card--upload">
+            <article class="card card--upload" id="generateCard">
                 <header class="card-head">
                     <h2>Generate from a PDF</h2>
                     <p>Upload study material to create a structured question set for focused review.</p>
@@ -169,7 +198,7 @@
                 <div id="uploadStatus" class="upload-status" style="display: none;" role="status" aria-live="polite"></div>
             </article>
 
-            <article class="card card--import">
+            <article class="card card--import" id="importCard">
                 <header class="card-head">
                     <h2>Import a question set</h2>
                     <p>Select a response format, copy the prompt, then paste the generated JavaScript array below.</p>
@@ -244,19 +273,17 @@
             </div>
         </section>
 
-        <footer class="app-footer">
-            <a href="https://github.com/DarryllPj77" target="_blank" rel="noopener">Built by DarryllPj77</a>
-            <span aria-hidden="true">·</span>
-            <span>Question content belongs to its original authors</span>
-        </footer>
     </main>
 
-    <div class="container" id="examContainer" style="display: none;">
-        <div class="header">
+    <div class="container quiz" id="examContainer" style="display: none;">
+      <div class="quiz-layout">
+        <section class="quiz-main" aria-label="Question">
+        <div class="header quiz-head">
             <div class="exam-header__row">
                 <div class="exam-header__identity">
                     <span class="exam-header__eyebrow" id="modeContext">Active assessment</span>
                     <h1 id="modeTitle">Exam Mode</h1>
+                    <span class="quiz-head__set">Question set: <strong id="quizSetTitle">Default question set</strong></span>
                 </div>
                 <div class="exam-timer-block">
                     <span>Time remaining</span>
@@ -273,19 +300,21 @@
         </div>
 
         <div class="exam-content" id="examContent">
-            <button class="back-button" onclick="backToDashboard()">← Return to dashboard</button>
             <div class="question-card">
                 <div class="question-header">
                     <div class="question-number" id="questionNumber"></div>
+                    <button type="button" class="back-button" onclick="backToDashboard()">Save and exit</button>
                 </div>
                 <div class="question-text" id="questionText"></div>
+            </div>
+            <div class="answers-card">
                 <div class="choices" id="choices"></div>
                 <div id="trainingFeedback" style="display: none;"></div>
             </div>
 
             <div class="navigation">
-                <button class="nav-button nav-button--secondary" id="prevButton" onclick="previousQuestion()">Previous</button>
-                <button class="nav-button" id="nextButton" onclick="nextQuestion()">Next</button>
+                <button class="nav-button nav-button--secondary" id="prevButton" onclick="previousQuestion()"><span aria-hidden="true">&#8249;</span> Previous</button>
+                <button class="nav-button" id="nextButton" onclick="nextQuestion()">Next <span aria-hidden="true">&#8250;</span></button>
                 <button class="nav-button submit-button" id="submitButton" style="display: none;" onclick="submitExam()">Submit assessment</button>
             </div>
         </div>
@@ -337,6 +366,25 @@
                 <div class="question-review" id="questionReview"></div>
             </section>
             <button class="restart-button" onclick="backToDashboard()">Return to dashboard</button>
+        </div>
+        </section>
+
+        <aside class="quiz-panel" id="quizPanel" aria-labelledby="quizPanelTitle">
+            <div class="quiz-panel__head">
+                <h2 id="quizPanelTitle">Questions</h2>
+                <span class="quiz-panel__count" id="navigatorCount">0 / 0</span>
+            </div>
+            <div class="question-nav" id="questionNav" role="list" aria-label="Jump to question"></div>
+            <ul class="question-nav__legend" aria-label="Legend">
+                <li><span class="qn-swatch qn-swatch--current" aria-hidden="true"></span>Current</li>
+                <li><span class="qn-swatch qn-swatch--answered" aria-hidden="true"></span>Answered</li>
+                <li><span class="qn-swatch" aria-hidden="true"></span>Not answered</li>
+            </ul>
+            <p class="quiz-panel__summary" id="navigatorSummary" aria-live="polite"></p>
+            <button type="button" class="btn btn--primary btn--full" onclick="submitFromNavigator()">Submit assessment</button>
+        </aside>
+      </div>
+    </div>
         </div>
     </div>
 
