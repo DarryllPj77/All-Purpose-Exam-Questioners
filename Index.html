@@ -58,6 +58,7 @@
             <nav class="side-nav">
                 <p class="side-nav__label">Workspace</p>
                 <a class="side-nav__link is-active" href="#dashboard" data-nav-target="dashboard" aria-current="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Dashboard</span></a>
+                <a class="side-nav__link" href="#progressSection" data-nav-target="progressSection"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Your progress</span></a>
                 <a class="side-nav__link" href="#studyCard" data-nav-target="studyCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/></svg><span>Study session</span></a>
                 <a class="side-nav__link" href="#generateCard" data-nav-target="generateCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Generate from PDF</span></a>
                 <a class="side-nav__link" href="#importCard" data-nav-target="importCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg><span>Import a set</span></a>
@@ -104,6 +105,79 @@
             <span class="dashboard-eyebrow">Assessment workspace</span>
             <h1>Exam Review &amp; Practice Suite</h1>
             <p class="dashboard-tagline">Turn a PDF into an exam, practise in timed or guided sessions, and review every answer afterwards.</p>
+        </section>
+
+        <section class="card pg" id="progressSection" aria-labelledby="pgHeading">
+            <header class="card-head">
+                <h2 id="pgHeading">Your progress</h2>
+                <p>Each study mode measures something different, so each keeps its own numbers here.</p>
+            </header>
+            <div class="ui-state ui-state--loading" id="pgState" role="status" hidden></div>
+            <div class="pg-body" id="pgBody" hidden>
+                <div class="score-details pg-stats">
+                    <div class="score-card"><span class="score-card__label">Questions studied</span><div class="number" id="pgStudied">0</div><span class="score-card__caption" id="pgStudiedNote"></span></div>
+                    <button type="button" class="score-card pg-stat" data-open-view="mistakes"><span class="score-card__label">Need attention</span><span class="number" id="pgAttention">0</span><span class="score-card__caption">Open in Mistake review &#8250;</span></button>
+                    <div class="score-card"><span class="score-card__label">Mastered in Learn</span><div class="number" id="pgMastered">0</div><span class="score-card__caption">Across all your sets</span></div>
+                    <button type="button" class="score-card pg-stat" data-open-view="review"><span class="score-card__label">Due for review</span><span class="number" id="pgDue">0</span><span class="score-card__caption">Smart review, by tonight &#8250;</span></button>
+                </div>
+
+                <div class="pg-grid">
+                    <section class="pg-panel" aria-labelledby="pgContinueTitle">
+                        <h3 class="pg-panel__title" id="pgContinueTitle">Continue studying</h3>
+                        <ul class="pg-list" id="pgContinue"></ul>
+                        <p class="pt-hint" id="pgContinueEmpty" hidden>Nothing to continue yet. Pick a study mode below to start.</p>
+                    </section>
+                    <section class="pg-panel" aria-labelledby="pgActTitle">
+                        <h3 class="pg-panel__title" id="pgActTitle">Activity, last 14 days</h3>
+                        <p class="pt-hint">Answers per day in every mode. Hover or focus a day for details.</p>
+                        <div class="pg-chart" id="pgActChart">
+                            <div class="pg-chart__axis" aria-hidden="true"><span id="pgActMax"></span><span id="pgActMid"></span><span>0</span></div>
+                            <div class="pg-chart__plot"><div class="pg-chart__bars" id="pgActBars"></div></div>
+                            <div class="pg-chart__tip" id="pgActTip" role="tooltip" hidden></div>
+                        </div>
+                        <div class="pg-chart__x" aria-hidden="true"><span id="pgActFirst"></span><span id="pgActLast"></span></div>
+                        <p class="pg-chart__summary" id="pgActSummary"></p>
+                        <details class="pg-table">
+                            <summary>Show as a table</summary>
+                            <table><thead><tr><th scope="col">Day</th><th scope="col">Answers</th><th scope="col">Graded</th><th scope="col">Correct</th></tr></thead><tbody id="pgActTable"></tbody></table>
+                        </details>
+                    </section>
+                </div>
+
+                <section class="pg-panel" aria-labelledby="pgSetsTitle">
+                    <h3 class="pg-panel__title" id="pgSetsTitle">Your sets</h3>
+                    <div class="pg-sets">
+                        <div class="pg-sets__list">
+                            <p class="pt-hint">Most recently studied first. Choose one to see its numbers.</p>
+                            <ul class="pg-setlist" id="pgSets"></ul>
+                            <button type="button" class="btn btn--ghost btn--sm" id="pgSetsMore" hidden>All sets in the library</button>
+                        </div>
+                        <div class="pg-sets__detail">
+                            <h4 class="pg-sets__title" id="pgSetTitle"></h4>
+                            <div class="pg-measures" id="pgMeasures"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="pg-panel" aria-labelledby="pgPracticeTitle">
+                    <div class="pg-panel__head">
+                        <h3 class="pg-panel__title" id="pgPracticeTitle">Practice test scores</h3>
+                        <button type="button" class="btn btn--ghost btn--sm" id="pgPracticeAll">Performance history</button>
+                    </div>
+                    <p class="pt-hint" id="pgPracticeEmpty" hidden>No practice tests yet. Your scores appear here after you finish one.</p>
+                    <div class="pg-chart pg-chart--percent" id="pgPracticeChart">
+                        <div class="pg-chart__axis" aria-hidden="true"><span>100%</span><span>50%</span><span>0</span></div>
+                        <div class="pg-chart__plot"><div class="pg-chart__bars" id="pgPracticeBars"></div></div>
+                        <div class="pg-chart__tip" id="pgPracticeTip" role="tooltip" hidden></div>
+                    </div>
+                    <p class="pg-chart__summary" id="pgPracticeSummary"></p>
+                    <p class="pt-hint">Bars are scores, oldest on the left. The line on each bar is that test's pass mark.</p>
+                    <details class="pg-table" id="pgPracticeTableWrap">
+                        <summary>Show as a table</summary>
+                        <table><thead><tr><th scope="col">Date</th><th scope="col">Set</th><th scope="col">Score</th><th scope="col">Pass mark</th></tr></thead><tbody id="pgPracticeTable"></tbody></table>
+                    </details>
+                </section>
+            </div>
         </section>
 
         <section class="dashboard-grid">
@@ -1420,6 +1494,7 @@
     <script src="questions.js"></script>
     <script src="Cert.js"></script>
     <script src="js/shell.js"></script>
+    <script src="js/progress.js"></script>
     <script src="js/modes/flashcards.js"></script>
     <script src="js/modes/practice.js"></script>
     <script src="js/modes/mistakes.js"></script>

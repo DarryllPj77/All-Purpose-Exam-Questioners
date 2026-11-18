@@ -17,8 +17,8 @@ only what is implemented and verified; planned work is listed separately.
 | 6 | Active recall | Committed (`a4458d6`) |
 | 7 | Smart review (spaced repetition) | Committed (`3827276`) |
 | 8 | Matching | Committed (`bca38dc`) |
-| 9 | Code challenge | Implemented, not yet committed |
-| 10 | Unified dashboard | Planned |
+| 9 | Code challenge | Committed (`27916ea`) |
+| 10 | Unified dashboard | Implemented, not yet committed |
 
 ## Architecture
 
@@ -32,7 +32,8 @@ only what is implemented and verified; planned work is listed separately.
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `js/core/code.js` (code display and highlighting, `Quizer.code`),
   `questions.js`, `Cert.js` (existing exam and training engine),
-  `js/shell.js` (sidebar, header and question navigator), then one file per
+  `js/shell.js` (sidebar, header and question navigator), `js/progress.js`
+  (the dashboard's "Your progress" card), then one file per
   study mode in `js/modes/` (`flashcards.js`, `learn.js`, `recall.js`,
   `review.js`, `practice.js`, `mistakes.js`, `matching.js`, `code.js`).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
@@ -341,6 +342,48 @@ fire-and-forget and never affects the score or the results screen.
 * **Sample set:** "Add a C# sample set" (shown when a set has no code
   questions) adds nine C# questions covering every challenge type.
 
+## Unified progress dashboard (Phase 10)
+
+* **One endpoint** (`GET /api/dashboard?tzOffset=`, `dashboard_routes.py`)
+  feeds a "Your progress" card at the top of the dashboard. No new tables:
+  it reads the answer log, `question_progress`, `study_sessions` and
+  `session_history`. Before counting it runs the same reconciliation as the
+  Mistake review and Smart review pages, so the numbers always agree with
+  those pages (a test checks this).
+* **Separate measures, never one blended score.** For the chosen set:
+  * Answers: questions studied, graded answers and the share correct.
+    Only answers the app graded count (correct, incorrect, partial).
+    Self-ratings (Active recall, the recall formats in Learn and Smart
+    review), flashcard flips and skipped questions are left out.
+  * Flashcards: the learner's own Know / Still learning labels.
+  * Learn mastery: mastered, familiar, learning, new.
+  * Mistake review: open and resolved.
+  * Smart review: due by the end of the learner's day, scheduled, mature
+    (21+ days).
+  Each panel says in one line what it measures. Thresholds come from
+  `learning_config.py` through the API, not from JavaScript.
+* **Top figures:** questions studied (of all questions), need attention
+  (open mistakes, opens Mistake review), mastered in Learn, due for review
+  (opens Smart review).
+* **Continue studying:** the four most recent (set, mode) pairs from the
+  answer log and saved sessions. Continue switches to that set first when
+  the mode works on one set, then opens the mode, which resumes where its
+  own saved state left off. Exam and training keep the dashboard's existing
+  "Continue session" button.
+* **Your sets:** most recently studied first (never-studied sets after,
+  newest first); choosing one shows its five measures.
+* **Charts** (plain HTML and CSS, one series and one axis each, a tooltip
+  on hover and keyboard focus, a table view): answers per day for the last
+  14 days in the learner's calendar, with graded accuracy in each tooltip;
+  and the last 10 practice test scores, each with a line at that test's own
+  pass mark.
+* **Refresh:** the card reloads when the dashboard comes back into view and
+  whenever the library or history re-renders (sign-in, imports, finished
+  exams).
+* **Not shown, on purpose:** topic performance (questions have no topic
+  field) and mastery over time (stage changes are not stored as history).
+  Neither is estimated.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -373,6 +416,7 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/recall/<setId>/<questionId>/rate` | Save an Active Recall self-assessment (`rating`, optional `text`) |
 | GET | `/api/review/overview` | Due, overdue, upcoming, maturity and 14-day history (`tzOffset`, optional `setId`) |
 | POST | `/api/review/<setId>/<questionId>/answer` | Grade a review (`choice` or `recall`) and reschedule it |
+| GET | `/api/dashboard` | Progress overview: totals, per-set measures, continue list, 14-day activity, practice scores (`tzOffset`) |
 | POST | `/api/code/<setId>/<questionId>/answer` | Grade a code challenge (`choice`, or typed `output` for output challenges); nothing is executed |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
@@ -399,3 +443,5 @@ and delete them afterwards. They are skipped if no database is reachable.
   regular expressions or nested string interpolation.
 * Code challenge answers are checked against the answer key; the app cannot
   tell whether a question's own snippet really behaves as its answer says.
+* The dashboard has no topic breakdown or mastery-over-time chart: the data
+  for them is not recorded, and the dashboard does not estimate it.

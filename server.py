@@ -72,6 +72,7 @@ from learn_routes import bp as learn_bp
 from recall_routes import bp as recall_bp
 from review_routes import bp as review_bp
 from code_routes import bp as code_bp
+from dashboard_routes import bp as dashboard_bp
 from db import cursor, execute, fetch_one, init_schema
 
 # Load .env before reading any env var.
@@ -102,6 +103,7 @@ app.register_blueprint(learn_bp)
 app.register_blueprint(recall_bp)
 app.register_blueprint(review_bp)
 app.register_blueprint(code_bp)
+app.register_blueprint(dashboard_bp)
 
 
 @app.after_request
@@ -127,7 +129,7 @@ def index():
 # never be served, so this is an allow-list, not a path check.
 PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
-    "js/core/learning.js", "js/core/code.js", "js/shell.js", "js/modes/flashcards.js",
+    "js/core/learning.js", "js/core/code.js", "js/shell.js", "js/progress.js", "js/modes/flashcards.js",
     "js/modes/practice.js", "js/modes/mistakes.js", "js/modes/learn.js", "js/modes/recall.js", "js/modes/review.js", "js/modes/matching.js", "js/modes/code.js",
 })
 
