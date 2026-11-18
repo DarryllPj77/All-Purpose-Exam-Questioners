@@ -12,8 +12,8 @@ only what is implemented and verified; planned work is listed separately.
 | 1 | Foundation: question ids, progress data model and API, shared JS core, scoped sessions, tests | Committed (`b6a9e2e`) |
 | 2 | Flashcards | Committed (`a98df25`) |
 | 3 | Practice test; exam and training answers logged | Committed (`dd19277`) |
-| 4 | Mistake review | Committed |
-| 5 | Learn mode | Planned |
+| 4 | Mistake review | Committed (`a09cf44`) |
+| 5 | Learn mode | Committed |
 | 6 | Active recall | Planned |
 | 7 | Smart review (spaced repetition) | Planned |
 | 8 | Matching | Planned |
@@ -32,7 +32,8 @@ only what is implemented and verified; planned work is listed separately.
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
-  study mode in `js/modes/` (`flashcards.js`, `practice.js`, `mistakes.js`).
+  study mode in `js/modes/` (`flashcards.js`, `learn.js`, `practice.js`,
+  `mistakes.js`).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
   shell, opened from a tile in the dashboard's "Study modes" section or from
   the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
@@ -180,6 +181,39 @@ fire-and-forget and never affects the score or the results screen.
 * **Topic filter:** not available, because questions carry no topic field;
   filtering is by set.
 
+## Learn (Phase 5)
+
+* **Rounds:** each round takes up to N unmastered questions (5, 10, 15 or
+  20): missed ("learning") first, then new, then familiar, in set order.
+  A miss comes back `requeue_after_incorrect` (3) questions later in the
+  same round; a correct answer leaves the round and returns in a later one.
+  So mastery needs correct answers across rounds, never one lucky streak.
+* **Stages** (`LEARN_MASTERY`): new → learning (after a miss) → familiar
+  (1 correct in a row) → mastered (3 correct in a row). Any miss resets the
+  streak and the stage to learning.
+* **Formats by stage:** new and learning questions use multiple choice;
+  familiar ones use a typed answer when the correct choice is short and
+  specific, otherwise recall with a self-check. Questions with several
+  answers always use multi-select; two-choice questions work as true/false.
+  Typed answers and recall can each be turned off.
+* **Grading on the server** (`learn_routes.py`): choice answers use the
+  shared rule; typed answers match the correct choice after
+  `normalize_text()` (case, quotes, punctuation, spacing and a leading
+  "a/an/the" are ignored), and the JS mirror is tested against the same
+  table. A question is offered for typing only when one choice can be
+  identified unambiguously and it is not a vague answer such as "All of
+  the above". Recall ratings are self-reported and stored as such.
+* **Records:** each answer updates the `learn_*` columns and is logged with
+  mode `learn` (so Learn misses reach Mistake Review); resent answers are
+  not counted twice.
+* **Pause and resume:** the round (queue, position, per-question results,
+  settings) is saved to `study_sessions` (mode `learn`) after each answer;
+  a saved round is discarded if any of its questions no longer exists.
+* **Summaries:** after each round (right first time, needed another go,
+  mastered so far) and when the whole set is mastered.
+* **Not included:** "I was right" overrides for typed answers; a near-miss
+  typo counts as incorrect.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -208,6 +242,7 @@ shared key is handed to the first account that signs in, then removed.
 | GET | `/api/mistakes` | Mistakes with question content, stats, summary and per-set counts (`setId` filter) |
 | POST | `/api/mistakes/<setId>/<questionId>/retry` | Grade a retry on the server (`selected`, `clientAttemptId`) |
 | POST | `/api/mistakes/reset` | Close open items for all sets, one set or one question; history is kept |
+| POST | `/api/learn/<setId>/<questionId>/answer` | Grade a Learn answer (`choice`, `written` or `recall`) and update mastery |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests

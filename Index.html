@@ -62,6 +62,7 @@
                 <a class="side-nav__link" href="#generateCard" data-nav-target="generateCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Generate from PDF</span></a>
                 <a class="side-nav__link" href="#importCard" data-nav-target="importCard"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></svg><span>Import a set</span></a>
                 <a class="side-nav__link" href="#flashcards" data-nav-target="flashcardsView" data-open-view="flashcards"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg><span>Flashcards</span></a>
+                <a class="side-nav__link" href="#learn" data-nav-target="learnView" data-open-view="learn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><span>Learn</span></a>
                 <a class="side-nav__link" href="#practice" data-nav-target="practiceView" data-open-view="practice"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="m9 13 1.5 1.5L14 11"/></svg><span>Practice test</span></a>
                 <a class="side-nav__link" href="#mistakes" data-nav-target="mistakesView" data-open-view="mistakes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span>Mistake review</span></a>
                 <p class="side-nav__label">Your data</p>
@@ -258,6 +259,15 @@
                 <p>More ways to study your active question set. Your place is saved in each one.</p>
             </header>
             <div class="mode-tiles">
+                <button type="button" class="mode-tile" data-open-view="learn">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Learn</span>
+                        <span class="mode-tile__desc">Adaptive rounds: misses come back, answers get harder as you improve, until every question is mastered.</span>
+                        <span class="mode-tile__meta" id="lnTileMeta">Uses your active question set</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
                 <button type="button" class="mode-tile" data-open-view="flashcards">
                     <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg></span>
                     <span class="mode-tile__body">
@@ -762,6 +772,145 @@
         </div>
         <p class="sr-only" id="mrLive" aria-live="polite"></p>
     </section>
+
+    <section class="mode-view" id="learnView" aria-labelledby="lnTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Learn</span>
+                <h1 id="lnTitle">Learn</h1>
+                <p class="mode-head__meta" id="lnMeta"></p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--secondary btn--sm" id="lnExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="lnState" role="status" hidden></div>
+
+        <!-- Intro -->
+        <div class="card ln-intro" id="lnIntro" hidden>
+            <header class="card-head">
+                <h2>Your progress toward mastery</h2>
+                <p id="lnRuleText"></p>
+            </header>
+            <div class="ln-progress">
+                <div class="ln-bar" id="lnBar" role="progressbar" aria-label="Questions mastered" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="ln-bar__seg ln-bar__seg--mastered" id="lnSeg_mastered"></span><span class="ln-bar__seg ln-bar__seg--familiar" id="lnSeg_familiar"></span><span class="ln-bar__seg ln-bar__seg--learning" id="lnSeg_learning"></span><span class="ln-bar__seg ln-bar__seg--new" id="lnSeg_new"></span></div>
+                <ul class="ln-legend"><li><span class="ln-dot ln-dot--mastered" aria-hidden="true"></span>Mastered <strong id="lnCount_mastered">0</strong></li><li><span class="ln-dot ln-dot--familiar" aria-hidden="true"></span>Familiar <strong id="lnCount_familiar">0</strong></li><li><span class="ln-dot ln-dot--learning" aria-hidden="true"></span>Learning <strong id="lnCount_learning">0</strong></li><li><span class="ln-dot ln-dot--new" aria-hidden="true"></span>New <strong id="lnCount_new">0</strong></li></ul>
+            </div>
+            <p class="ui-state ui-state--empty" id="lnAllDone" hidden>Every question is mastered. You can still practise them in a round.</p>
+            <fieldset class="pt-field ln-settings">
+                <legend class="field-label">Harder formats for familiar questions</legend>
+                <label class="pt-check"><input type="checkbox" id="lnWritten"> <span>Type the answer, when the answer is short</span></label>
+                <label class="pt-check"><input type="checkbox" id="lnRecall"> <span>Recall it, then check yourself</span></label>
+                <p class="pt-hint">New and missed questions always use multiple choice. Questions with several answers always use multi-select.</p>
+            </fieldset>
+            <div class="pt-field ln-size">
+                <label class="field-label" for="lnSize">Questions per round</label>
+                <select class="text-input mr-select" id="lnSize">
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20">20</option>
+                </select>
+            </div>
+            <div class="ln-intro__actions">
+                <button type="button" class="btn btn--primary" id="lnResume" hidden>Continue round</button>
+                <button type="button" class="btn btn--primary" id="lnStart">Start learning</button>
+            </div>
+        </div>
+
+        <!-- Question -->
+        <div class="ln-question" id="lnQuestion" hidden>
+            <div class="pt-runhead">
+                <div class="pt-runhead__row">
+                    <span class="pt-runhead__label" id="lnPos">Round 1</span>
+                    <button type="button" class="btn btn--ghost btn--sm" id="lnPause">Pause</button>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="Round progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="lnFill"></div>
+                </div>
+            </div>
+            <div class="question-card">
+                <div class="question-header">
+                    <span class="ln-stage" id="lnStage" data-stage="new">New</span>
+                    <span class="pt-type" id="lnFormat"></span>
+                </div>
+                <div class="question-text" id="lnText"></div>
+            </div>
+            <div class="answers-card">
+                <div id="lnChoicePane">
+                    <div class="choices" id="lnChoices"></div>
+                </div>
+                <form class="ln-written" id="lnWrittenPane" autocomplete="off" hidden>
+                    <label class="field-label" for="lnTyped">Your answer</label>
+                    <input type="text" class="text-input text-input--block ln-typed" id="lnTyped" maxlength="200" spellcheck="false">
+                    <p class="pt-hint">Capitals, punctuation and a leading "the" or "a" don't matter.</p>
+                    <div class="ln-written__actions" id="lnWrittenActions">
+                        <button type="submit" class="btn btn--primary" id="lnCheckWritten">Check answer</button>
+                        <button type="button" class="btn btn--ghost" id="lnDontKnow">I don't know</button>
+                    </div>
+                </form>
+                <div class="ln-recall" id="lnRecallPane" hidden>
+                    <p class="pt-hint">Say or think the answer first, then reveal it and be honest with yourself.</p>
+                    <button type="button" class="btn btn--secondary" id="lnReveal">Show answer</button>
+                    <div class="ln-recall__box" id="lnRecallAnswer" hidden></div>
+                    <div class="ln-rate" id="lnRateRow" hidden>
+                        <button type="button" class="btn fc-rate__btn fc-rate__btn--learning" id="lnDidnt">I didn't know it</button>
+                        <button type="button" class="btn fc-rate__btn fc-rate__btn--know" id="lnKnew">I knew it</button>
+                    </div>
+                </div>
+                <div class="pt-feedback" id="lnFeedback" role="status" hidden></div>
+            </div>
+            <div class="navigation">
+                <button type="button" class="nav-button" id="lnCheckChoice">Check answer</button>
+                <button type="button" class="nav-button" id="lnContinue" hidden>Continue</button>
+            </div>
+            <p class="pt-keys">Keys: <kbd>A</kbd>&ndash;<kbd>D</kbd> choose, <kbd>Enter</kbd> check and continue.</p>
+        </div>
+
+        <!-- Round summary -->
+        <div class="ln-round" id="lnRound" hidden>
+            <section class="result-hero" data-tone="passed">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Round summary</span>
+                    <h2 id="lnRoundTitle" tabindex="-1">Round complete</h2>
+                    <p id="lnRoundText"></p>
+                </div>
+            </section>
+            <div class="ln-progress">
+                <div class="ln-bar" id="lnRoundBar" role="progressbar" aria-label="Questions mastered" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="ln-bar__seg ln-bar__seg--mastered" id="lnRoundSeg_mastered"></span><span class="ln-bar__seg ln-bar__seg--familiar" id="lnRoundSeg_familiar"></span><span class="ln-bar__seg ln-bar__seg--learning" id="lnRoundSeg_learning"></span><span class="ln-bar__seg ln-bar__seg--new" id="lnRoundSeg_new"></span></div>
+                <ul class="ln-legend"><li><span class="ln-dot ln-dot--mastered" aria-hidden="true"></span>Mastered <strong id="lnRoundCount_mastered">0</strong></li><li><span class="ln-dot ln-dot--familiar" aria-hidden="true"></span>Familiar <strong id="lnRoundCount_familiar">0</strong></li><li><span class="ln-dot ln-dot--learning" aria-hidden="true"></span>Learning <strong id="lnRoundCount_learning">0</strong></li><li><span class="ln-dot ln-dot--new" aria-hidden="true"></span>New <strong id="lnRoundCount_new">0</strong></li></ul>
+            </div>
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">Right first time</span><div class="number" id="lnRoundFirst">0</div><span class="score-card__caption">This round</span></div>
+                <div class="score-card"><span class="score-card__label">Needed another go</span><div class="number" id="lnRoundRetried">0</div><span class="score-card__caption">Came back later</span></div>
+                <div class="score-card"><span class="score-card__label">Mastered</span><div class="number" id="lnRoundMastered">0</div><span class="score-card__caption">In this set</span></div>
+            </div>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="lnNextRound">Next round</button>
+                <button type="button" class="btn btn--ghost" id="lnRoundExit">Finish for now</button>
+            </div>
+        </div>
+
+        <!-- All mastered -->
+        <div class="ln-round" id="lnDone" hidden>
+            <section class="result-hero" data-tone="excellent">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Set mastered</span>
+                    <h2 id="lnDoneHeading" tabindex="-1">Everything mastered</h2>
+                    <p id="lnDoneText"></p>
+                </div>
+            </section>
+            <div class="ln-progress">
+                <div class="ln-bar" id="lnDoneBar" role="progressbar" aria-label="Questions mastered" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="ln-bar__seg ln-bar__seg--mastered" id="lnDoneSeg_mastered"></span><span class="ln-bar__seg ln-bar__seg--familiar" id="lnDoneSeg_familiar"></span><span class="ln-bar__seg ln-bar__seg--learning" id="lnDoneSeg_learning"></span><span class="ln-bar__seg ln-bar__seg--new" id="lnDoneSeg_new"></span></div>
+                <ul class="ln-legend"><li><span class="ln-dot ln-dot--mastered" aria-hidden="true"></span>Mastered <strong id="lnDoneCount_mastered">0</strong></li><li><span class="ln-dot ln-dot--familiar" aria-hidden="true"></span>Familiar <strong id="lnDoneCount_familiar">0</strong></li><li><span class="ln-dot ln-dot--learning" aria-hidden="true"></span>Learning <strong id="lnDoneCount_learning">0</strong></li><li><span class="ln-dot ln-dot--new" aria-hidden="true"></span>New <strong id="lnDoneCount_new">0</strong></li></ul>
+            </div>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="lnDoneExit">Back to dashboard</button>
+            </div>
+        </div>
+        <p class="sr-only" id="lnLive" aria-live="polite"></p>
+    </section>
         </div>
     </div>
 
@@ -813,5 +962,6 @@
     <script src="js/modes/flashcards.js"></script>
     <script src="js/modes/practice.js"></script>
     <script src="js/modes/mistakes.js"></script>
+    <script src="js/modes/learn.js"></script>
 </body>
 </html>
