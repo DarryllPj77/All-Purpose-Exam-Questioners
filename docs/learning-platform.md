@@ -14,8 +14,8 @@ only what is implemented and verified; planned work is listed separately.
 | 3 | Practice test; exam and training answers logged | Committed (`dd19277`) |
 | 4 | Mistake review | Committed (`a09cf44`) |
 | 5 | Learn mode | Committed (`f55bad3`) |
-| 6 | Active recall | Committed |
-| 7 | Smart review (spaced repetition) | Planned |
+| 6 | Active recall | Committed (`a4458d6`) |
+| 7 | Smart review (spaced repetition) | Committed |
 | 8 | Matching | Planned |
 | 9 | Code challenge | Planned |
 | 10 | Unified dashboard | Planned |
@@ -33,7 +33,7 @@ only what is implemented and verified; planned work is listed separately.
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
   study mode in `js/modes/` (`flashcards.js`, `learn.js`, `recall.js`,
-  `practice.js`, `mistakes.js`).
+  `review.js`, `practice.js`, `mistakes.js`).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
   shell, opened from a tile in the dashboard's "Study modes" section or from
   the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
@@ -242,6 +242,36 @@ fire-and-forget and never affects the score or the results screen.
 * **Shared text rule:** `normalizeText` now lives in `js/core/learning.js`;
   Learn uses the same function.
 
+## Smart review (Phase 7)
+
+* **Algorithm** (`review_routes.next_schedule`, values in `SRS`): a correct
+  review moves one step along 1, 3, 7, 14, 30 days, then multiplies the
+  previous interval by 2 up to 180 days. Partially correct repeats the
+  current interval. Incorrect returns to the first step (1 day). These are
+  initial defaults, not proven-optimal intervals.
+* **Due dates follow the learner's day:** a review falls due at local
+  midnight of the target day. The browser sends `Date.getTimezoneOffset()`
+  with each request, so "due today", "overdue" and the 7-day / 14-day views
+  use the learner's calendar; no timezone database is needed. Tested for
+  UTC+8 and UTC-5 across date boundaries.
+* **Data per question** (`question_progress`): `srs_step` (consecutive
+  successes), `srs_interval_days`, `srs_due_at`, `srs_last_reviewed_at`,
+  `srs_last_outcome`; full history in the answer log (mode `review`).
+* **Integration without conflicts:** only Smart Review answers change the
+  schedule. A question joins the schedule, due immediately, once it has any
+  answer in another mode. An incorrect answer elsewhere after the last
+  review makes it due now without changing its step or interval. A missed
+  review also reaches Mistake Review, like a miss in any mode. Learn
+  mastery, flashcard labels and recall ratings remain separate measures.
+* **Formats:** multiple choice graded on the server, or recall with a
+  self-rating (Forgot / Partly / Remembered).
+* **Screen:** overdue, due today, reviewed today and next 7 days; today's
+  progress; a 7-day upcoming chart; a 14-day history with accuracy;
+  maturity bands (learning under 7 days, young 7–20, mature 21+, not
+  studied yet); a set filter; the next review date after each answer.
+* **No resume needed:** each answer is scheduled the moment it is checked,
+  so stopping loses nothing; the next visit continues with what is due.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -272,6 +302,8 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/mistakes/reset` | Close open items for all sets, one set or one question; history is kept |
 | POST | `/api/learn/<setId>/<questionId>/answer` | Grade a Learn answer (`choice`, `written` or `recall`) and update mastery |
 | POST | `/api/recall/<setId>/<questionId>/rate` | Save an Active Recall self-assessment (`rating`, optional `text`) |
+| GET | `/api/review/overview` | Due, overdue, upcoming, maturity and 14-day history (`tzOffset`, optional `setId`) |
+| POST | `/api/review/<setId>/<questionId>/answer` | Grade a review (`choice` or `recall`) and reschedule it |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests

@@ -64,6 +64,7 @@
                 <a class="side-nav__link" href="#flashcards" data-nav-target="flashcardsView" data-open-view="flashcards"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="13" rx="2"/><path d="M7 4h12a2 2 0 0 1 2 2v11"/></svg><span>Flashcards</span></a>
                 <a class="side-nav__link" href="#learn" data-nav-target="learnView" data-open-view="learn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><span>Learn</span></a>
                 <a class="side-nav__link" href="#recall" data-nav-target="recallView" data-open-view="recall"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 0 0-5.8 1A3 3 0 0 0 4 11a3 3 0 0 0 2 5 3 3 0 0 0 6 1V5z"/><path d="M12 5a3 3 0 0 1 5.8 1A3 3 0 0 1 20 11a3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg><span>Active recall</span></a>
+                <a class="side-nav__link" href="#review" data-nav-target="reviewView" data-open-view="review"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg><span>Smart review</span></a>
                 <a class="side-nav__link" href="#practice" data-nav-target="practiceView" data-open-view="practice"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="m9 13 1.5 1.5L14 11"/></svg><span>Practice test</span></a>
                 <a class="side-nav__link" href="#mistakes" data-nav-target="mistakesView" data-open-view="mistakes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span>Mistake review</span></a>
                 <p class="side-nav__label">Your data</p>
@@ -260,6 +261,15 @@
                 <p>More ways to study your active question set. Your place is saved in each one.</p>
             </header>
             <div class="mode-tiles">
+                <button type="button" class="mode-tile" data-open-view="review">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Smart review</span>
+                        <span class="mode-tile__desc">Spaced repetition across all your sets: review each question just before you would forget it.</span>
+                        <span class="mode-tile__meta" id="rvTileMeta">Spaced reviews across your sets</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
                 <button type="button" class="mode-tile" data-open-view="learn">
                     <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span>
                     <span class="mode-tile__body">
@@ -1021,6 +1031,132 @@
         </div>
         <p class="sr-only" id="rcLive" aria-live="polite"></p>
     </section>
+
+    <section class="mode-view mode-view--wide" id="reviewView" aria-labelledby="rvTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Smart review</span>
+                <h1 id="rvTitle">Spaced review</h1>
+                <p class="mode-head__meta">Questions come back just before you'd forget them: 1, 3, 7, 14 and 30 days apart, longer after that.</p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--secondary btn--sm" id="rvExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="rvState" role="status" hidden></div>
+
+        <div class="rv-overview" id="rvOverview" hidden>
+            <div class="mr-toolbar">
+                <div class="mr-field">
+                    <label class="field-label" for="rvSet">Question set</label>
+                    <select class="text-input mr-select" id="rvSet"></select>
+                </div>
+                <div class="mr-field">
+                    <label class="field-label" for="rvFormat">Answer by</label>
+                    <select class="text-input mr-select" id="rvFormat">
+                        <option value="choice">Multiple choice (graded)</option>
+                        <option value="recall">Recall, then rate yourself</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="score-details rv-stats">
+                <div class="score-card"><span class="score-card__label">Overdue</span><div class="number" id="rvStatOverdue">0</div><span class="score-card__caption">From earlier days</span></div>
+                <div class="score-card"><span class="score-card__label">Due today</span><div class="number" id="rvStatToday">0</div><span class="score-card__caption">By midnight, your time</span></div>
+                <div class="score-card"><span class="score-card__label">Reviewed today</span><div class="number" id="rvStatDone">0</div><span class="score-card__caption" id="rvStatDoneNote">None yet today</span></div>
+                <div class="score-card"><span class="score-card__label">Next 7 days</span><div class="number" id="rvStatWeek">0</div><span class="score-card__caption">Coming up</span></div>
+            </div>
+
+            <div class="card rv-today">
+                <div class="fc-progress__row"><span class="field-label">Today</span><span id="rvDailyLabel"></span></div>
+                <div class="fc-progress__track" id="rvDaily" role="progressbar" aria-label="Reviews done today" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="fc-progress__fill" id="rvDailyFill"></div>
+                </div>
+                <div class="mr-actions">
+                    <button type="button" class="btn btn--primary" id="rvStart"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg><span id="rvStartLabel">Review</span></button>
+                </div>
+                <p class="ui-state ui-state--empty" id="rvCaughtUp" hidden></p>
+                <p class="ui-state ui-state--empty" id="rvEmpty" hidden>Nothing is scheduled yet. Questions join your review schedule once you study them in any mode.</p>
+            </div>
+
+            <div class="rv-grid">
+                <section class="card rv-panel" aria-labelledby="rvUpTitle">
+                    <h2 id="rvUpTitle" class="rv-panel__title">Next 7 days</h2>
+                    <ol class="rv-days" id="rvUpcoming"></ol>
+                </section>
+                <section class="card rv-panel" aria-labelledby="rvHistTitle">
+                    <h2 id="rvHistTitle" class="rv-panel__title">Last 14 days</h2>
+                    <ol class="rv-history" id="rvHistory"></ol>
+                    <p class="pt-hint" id="rvHistorySummary"></p>
+                </section>
+            </div>
+
+            <section class="card rv-panel" aria-labelledby="rvMatTitle">
+                <h2 id="rvMatTitle" class="rv-panel__title">How well it's sticking</h2>
+                <div class="ln-bar" role="img" aria-label="Questions by review interval"><span class="ln-bar__seg rv-seg--mature" id="rvSeg_mature"></span><span class="ln-bar__seg rv-seg--young" id="rvSeg_young"></span><span class="ln-bar__seg rv-seg--learning" id="rvSeg_learning"></span><span class="ln-bar__seg rv-seg--notStarted" id="rvSeg_notStarted"></span></div>
+                <ul class="ln-legend"><li><span class="ln-dot rv-seg--mature" aria-hidden="true"></span>Mature (21+ days) <strong id="rvCount_mature">0</strong></li><li><span class="ln-dot rv-seg--young" aria-hidden="true"></span>Young (7–20 days) <strong id="rvCount_young">0</strong></li><li><span class="ln-dot rv-seg--learning" aria-hidden="true"></span>Learning (under 7 days) <strong id="rvCount_learning">0</strong></li><li><span class="ln-dot rv-seg--notStarted" aria-hidden="true"></span>Not studied yet <strong id="rvCount_notStarted">0</strong></li></ul>
+            </section>
+        </div>
+
+        <div class="ln-question" id="rvSession" hidden>
+            <div class="pt-runhead">
+                <div class="pt-runhead__row">
+                    <span class="pt-runhead__label" id="rvPos">Question 1</span>
+                    <button type="button" class="btn btn--ghost btn--sm" id="rvStop">Stop</button>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="Review progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="rvFill"></div>
+                </div>
+            </div>
+            <div class="question-card">
+                <div class="question-header">
+                    <span class="ln-stage rv-due" id="rvDueTag" data-overdue="false">Due today</span>
+                    <span class="pt-type" id="rvMaturity"></span>
+                </div>
+                <p class="mr-item__meta" id="rvSetTitle"></p>
+                <div class="question-text" id="rvText"></div>
+            </div>
+            <div class="answers-card">
+                <div id="rvChoicePane"><div class="choices" id="rvChoices"></div></div>
+                <div class="ln-recall" id="rvRecallPane" hidden>
+                    <p class="pt-hint">Recall the answer, reveal it, then rate yourself.</p>
+                    <button type="button" class="btn btn--secondary" id="rvReveal">Show answer</button>
+                    <div class="ln-recall__box" id="rvRecallBox" hidden><p class="fc-face__label">Answer</p><div id="rvRecallAnswer"></div></div>
+                    <div class="rc-rate" id="rvRate" role="group" aria-label="How well did you remember?" hidden>
+                        <button type="button" class="btn rc-rate__btn rc-rate__btn--incorrect" id="rvRateAgain"><kbd>1</kbd> Forgot</button>
+                        <button type="button" class="btn rc-rate__btn rc-rate__btn--partial" id="rvRateHard"><kbd>2</kbd> Partly</button>
+                        <button type="button" class="btn rc-rate__btn rc-rate__btn--correct" id="rvRateGood"><kbd>3</kbd> Remembered</button>
+                    </div>
+                </div>
+                <div class="pt-feedback" id="rvFeedback" role="status" hidden></div>
+            </div>
+            <div class="navigation">
+                <button type="button" class="nav-button" id="rvCheck">Check answer</button>
+                <button type="button" class="nav-button" id="rvNext" hidden>Next question</button>
+            </div>
+        </div>
+
+        <div class="ln-round" id="rvDone" hidden>
+            <section class="result-hero" data-tone="passed">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Review finished</span>
+                    <h2 id="rvDoneHeading" tabindex="-1">All due reviews done</h2>
+                    <p id="rvDoneText"></p>
+                </div>
+            </section>
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">Remembered</span><div class="number" id="rvDoneCorrect">0</div><span class="score-card__caption">Interval grew</span></div>
+                <div class="score-card"><span class="score-card__label">Partly</span><div class="number" id="rvDonePartial">0</div><span class="score-card__caption">Same interval</span></div>
+                <div class="score-card"><span class="score-card__label">Forgot</span><div class="number" id="rvDoneIncorrect">0</div><span class="score-card__caption">Back to 1 day</span></div>
+            </div>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="rvDoneBack">Back to schedule</button>
+                <button type="button" class="btn btn--ghost" id="rvDoneExit">Back to dashboard</button>
+            </div>
+        </div>
+        <p class="sr-only" id="rvLive" aria-live="polite"></p>
+    </section>
         </div>
     </div>
 
@@ -1074,5 +1210,6 @@
     <script src="js/modes/mistakes.js"></script>
     <script src="js/modes/learn.js"></script>
     <script src="js/modes/recall.js"></script>
+    <script src="js/modes/review.js"></script>
 </body>
 </html>

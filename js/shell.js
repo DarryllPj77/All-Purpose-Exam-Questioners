@@ -13,6 +13,7 @@ const MODE_VIEWS = [
     { key: 'flashcards', label: 'Flashcards' },
     { key: 'learn', label: 'Learn' },
     { key: 'recall', label: 'Active recall' },
+    { key: 'review', label: 'Smart review' },
     { key: 'practice', label: 'Practice test' },
     { key: 'mistakes', label: 'Mistake review' },
 ];

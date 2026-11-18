@@ -3222,7 +3222,7 @@ body { padding: 0; }
 .quiz-head .exam-progress-meta { margin-top: var(--s-5); }
 
 #examContainer .exam-content { padding: 0; display: flex; flex-direction: column; gap: var(--s-4); }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-card {
     margin: 0;
     padding: var(--s-6);
     border: 1px solid var(--c-border);
@@ -3230,21 +3230,21 @@ body { padding: 0; }
     background: var(--c-surface);
     overflow: visible;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card::before { content: none; }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-header { margin-bottom: var(--s-4); gap: var(--s-3); }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-number {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-card::before { content: none; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-header { margin-bottom: var(--s-4); gap: var(--s-3); }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-number {
     background: var(--c-primary-soft);
     color: var(--c-primary-2);
     box-shadow: none;
     font-weight: 600;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .back-button {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .back-button {
     margin: 0;
     min-height: 36px;
     background: transparent;
     border-color: var(--c-border-strong);
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-text { margin: 0; font-size: 19px; line-height: 1.6; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-text { margin: 0; font-size: 19px; line-height: 1.6; }
 
 .answers-card {
     padding: var(--s-3);
@@ -3270,14 +3270,14 @@ body { padding: 0; }
 .answers-card .choice-label { width: 36px; height: 36px; font-size: 14px; }
 .answers-card #trainingFeedback { margin: var(--s-3) var(--s-2) var(--s-2); }
 
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .navigation {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .navigation {
     margin: 0;
     padding: 0;
     border: 0;
     flex-direction: row;
     justify-content: center;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .nav-button { width: auto; min-width: 140px; min-height: 44px; font-weight: 500; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .nav-button { width: auto; min-width: 140px; min-height: 44px; font-weight: 500; }
 
 /* Navigator panel */
 .quiz-panel {
@@ -3409,11 +3409,11 @@ body { padding: 0; }
     .app-bar { margin-bottom: var(--s-5); }
     .quiz-head .exam-header__row { align-items: flex-start; }
     .quiz-head .exam-timer-block { padding: 6px 6px 6px 12px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card { padding: var(--s-5); }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .back-button { min-height: 44px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-text { font-size: 17px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .navigation { flex-direction: row; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .nav-button { flex: 1; min-width: 0; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-card { padding: var(--s-5); }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .back-button { min-height: 44px; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .question-text { font-size: 17px; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .navigation { flex-direction: row; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView, #reviewView) .nav-button { flex: 1; min-width: 0; }
     .quiz-panel .btn--full { width: 100%; }
     .app-bar__eyebrow { display: none; }
 }
@@ -4056,3 +4056,56 @@ kbd {
     .rc-rate { grid-template-columns: 1fr; }
     .rc-reveal { align-self: stretch; }
 }
+
+/* ============================================================
+   Smart review
+   ============================================================ */
+.rv-overview { display: flex; flex-direction: column; gap: var(--s-5); }
+.rv-overview[hidden] { display: none; }
+.rv-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.rv-today { gap: var(--s-3); }
+.rv-today .ui-state[hidden] { display: none; }
+.rv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-5); }
+.rv-panel { gap: var(--s-4); }
+.rv-panel__title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.rv-days, .rv-history { list-style: none; display: grid; align-items: end; gap: 6px; }
+.rv-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.rv-history { grid-template-columns: repeat(14, minmax(0, 1fr)); height: 96px; }
+.rv-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rv-day__count { font: 500 13px/1 var(--ff-mono); color: var(--c-text); }
+.rv-day__track, .rv-hist__track {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    width: 100%;
+    height: 72px;
+    border-radius: 6px;
+    background: var(--c-surface-3);
+    overflow: hidden;
+}
+.rv-hist__track { height: 96px; }
+.rv-day__bar { width: 100%; background: var(--c-primary); border-radius: 6px 6px 0 0; min-height: 0; }
+.rv-day__label { font-size: 12px; color: var(--c-text-soft); }
+.rv-hist { display: flex; height: 100%; }
+.rv-hist__good { width: 100%; background: var(--c-success); }
+.rv-hist__other { width: 100%; background: var(--c-warning); }
+.rv-seg--mature { background: var(--c-success); }
+.rv-seg--young { background: var(--c-primary); }
+.rv-seg--learning { background: var(--c-warning); }
+.rv-seg--notStarted { background: var(--c-border-strong); }
+.rv-due[data-overdue="true"] { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.rv-due[data-overdue="false"] { background: var(--c-primary-soft); color: var(--c-primary-2); }
+#reviewView .mr-item__meta { margin-top: -6px; margin-bottom: var(--s-2); }
+
+@media (max-width: 900px) {
+    .rv-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .rv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .rv-history { gap: 3px; }
+}
+
+/* A partly-right review is amber, not the rose used for misses */
+.pt-feedback--partial { border-color: rgba(226, 188, 116, 0.35); box-shadow: inset 3px 0 0 var(--c-warning); }
+.pt-feedback--partial .pt-feedback__status { color: var(--c-warning-ink); }
