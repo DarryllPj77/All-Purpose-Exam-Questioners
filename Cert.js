@@ -573,6 +573,16 @@ function normalizeImportedQuestion(question, index) {
         }
     }
 
+    // Optional alternative wordings accepted in Active Recall typed answers.
+    let acceptedAnswers;
+    if (question.acceptedAnswers != null) {
+        if (!Array.isArray(question.acceptedAnswers) || question.acceptedAnswers.length > 20 ||
+            question.acceptedAnswers.some(a => typeof a !== 'string' || !a.trim() || a.length > 200)) {
+            throw new Error(`${label} acceptedAnswers must be a list of up to 20 short text answers.`);
+        }
+        acceptedAnswers = question.acceptedAnswers.map(a => a.trim());
+    }
+
     return Object.assign({}, question, {
         text: question.text.trim(),
         choices,
@@ -580,7 +590,7 @@ function normalizeImportedQuestion(question, index) {
         answerDescriptions,
         responseType,
         maxSelections
-    });
+    }, acceptedAnswers ? { acceptedAnswers } : {});
 }
 
 function importManualSet() {

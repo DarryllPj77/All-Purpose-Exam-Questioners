@@ -29,15 +29,11 @@
 
     // ---- Pure logic ------------------------------------------------------------
 
-    /** Mirrors normalize_text() in learn_routes.py exactly. */
-    function normalizeText(value) {
-        return String(value == null ? '' : value)
-            .normalize('NFKC').toLowerCase().trim()
-            .replace(/["'“”‘’`]/g, '')
-            .replace(/[^\p{L}\p{N}_\s]/gu, ' ')
-            .replace(/\s+/g, ' ').trim()
-            .replace(/^(a|an|the) /, '');
-    }
+    // One text rule for every mode: the shared core (js/core/learning.js),
+    // which mirrors normalize_text() in learn_routes.py.
+    const core = (root && root.Quizer && root.Quizer.learning)
+        || (typeof require === 'function' ? require('../core/learning.js') : null);
+    function normalizeText(value) { return core.normalizeText(value); }
 
     function answerList(answer) {
         return Array.isArray(answer) ? answer.map(String) : (answer == null ? [] : [String(answer)]);

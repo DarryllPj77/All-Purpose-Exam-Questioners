@@ -35,6 +35,48 @@
         return expected.every((key, i) => key === given[i]);
     }
 
+    /**
+     * Text comparison form: case, quotes, punctuation, spacing and a leading
+     * article never matter. Mirrors normalize_text() in learn_routes.py; both
+     * are tested against the same table.
+     */
+    function normalizeText(value) {
+        return String(value == null ? '' : value)
+            .normalize('NFKC').toLowerCase().trim()
+            .replace(/["'“”‘’`]/g, '')
+            .replace(/[^\p{L}\p{N}_\s]/gu, ' ')
+            .replace(/\s+/g, ' ').trim()
+            .replace(/^(a|an|the) /, '');
+    }
+
+    const VAGUE_ANSWER = /(of the above|^both\b|^neither\b|^all\b|^none\b)/;
+
+    /**
+     * Typed answers that count as a match: the correct choice's text (for a
+     * single, specific answer) plus any explicit acceptedAnswers on the
+     * question. Mirrors accepted_answers() in recall_routes.py.
+     */
+    function acceptedAnswers(question) {
+        const out = [];
+        const answers = normalizeAnswerList(question && question.answer);
+        const choices = (question && question.choices) || {};
+        if (answers.length === 1 && typeof choices[answers[0]] === 'string') {
+            const text = choices[answers[0]].trim();
+            if (text && !VAGUE_ANSWER.test(normalizeText(text))) out.push(text);
+        }
+        const extra = question && question.acceptedAnswers;
+        if (Array.isArray(extra)) extra.forEach((a) => { if (typeof a === 'string' && a.trim()) out.push(a.trim()); });
+        return out;
+    }
+
+    /** true / false when a typed answer can be checked, null when it can't. */
+    function matchesAccepted(question, typed) {
+        const accepted = acceptedAnswers(question).map(normalizeText).filter(Boolean);
+        const given = normalizeText(typed);
+        if (!accepted.length || !given) return null;
+        return accepted.includes(given);
+    }
+
     /** localStorage key for the in-progress exam of one signed-in user. */
     function examSessionKey(userId) {
         if (userId === null || userId === undefined || userId === '') return null;
@@ -144,6 +186,9 @@
     return {
         normalizeAnswerList,
         isCorrectAnswer,
+        normalizeText,
+        acceptedAnswers,
+        matchesAccepted,
         examSessionKey,
         newClientId,
         api: learningApi,

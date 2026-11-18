@@ -27,6 +27,7 @@ Routes:
   POST /api/mistakes/<setId>/<qId>/retry → grade a retry on the server
   POST /api/mistakes/reset             → close review items (history is kept)
   POST /api/learn/<setId>/<qId>/answer → grade a Learn answer, update mastery
+  POST /api/recall/<setId>/<qId>/rate  → save an Active Recall self-assessment
 
   POST /api/analyze                    → PDF analysis (login required)
   POST /api/generate                   → submit generation job (login required)
@@ -66,6 +67,7 @@ from data_routes import bp as data_bp, _new_set_id
 from progress_routes import bp as progress_bp
 from mistakes_routes import bp as mistakes_bp
 from learn_routes import bp as learn_bp
+from recall_routes import bp as recall_bp
 from db import cursor, execute, fetch_one, init_schema
 
 # Load .env before reading any env var.
@@ -93,6 +95,7 @@ app.register_blueprint(data_bp)
 app.register_blueprint(progress_bp)
 app.register_blueprint(mistakes_bp)
 app.register_blueprint(learn_bp)
+app.register_blueprint(recall_bp)
 
 
 @app.after_request
@@ -119,7 +122,7 @@ def index():
 PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
     "js/core/learning.js", "js/shell.js", "js/modes/flashcards.js",
-    "js/modes/practice.js", "js/modes/mistakes.js", "js/modes/learn.js",
+    "js/modes/practice.js", "js/modes/mistakes.js", "js/modes/learn.js", "js/modes/recall.js",
 })
 
 

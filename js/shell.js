@@ -12,6 +12,7 @@ function isExamVisible() {
 const MODE_VIEWS = [
     { key: 'flashcards', label: 'Flashcards' },
     { key: 'learn', label: 'Learn' },
+    { key: 'recall', label: 'Active recall' },
     { key: 'practice', label: 'Practice test' },
     { key: 'mistakes', label: 'Mistake review' },
 ];

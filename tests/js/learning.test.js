@@ -47,6 +47,36 @@ test('saved exam sessions are keyed per user', () => {
     assert.equal(L.examSessionKey(undefined), null);
 });
 
+// Shared with tests/test_recall_api.py MATCH_CASES: server and browser must agree.
+const SINGLE = { choices: { A: 'Paris', B: 'Rome' }, answer: ['A'], acceptedAnswers: ['City of Light'] };
+const VAGUE = { choices: { A: 'All of the above', B: 'x' }, answer: ['A'] };
+const MULTI = { choices: { A: '2', B: '3', C: '4' }, answer: ['A', 'C'], acceptedAnswers: ['2 and 4'] };
+const MULTI_PLAIN = { choices: { A: '2', B: '3', C: '4' }, answer: ['A', 'C'] };
+const MATCH_CASES = [
+    [SINGLE, 'paris', true],
+    [SINGLE, '  The PARIS. ', true],
+    [SINGLE, 'city of light!', true],
+    [SINGLE, 'Rome', false],
+    [SINGLE, '', null],
+    [VAGUE, 'all of the above', null],
+    [MULTI, '2 AND 4', true],
+    [MULTI, '2', false],
+    [MULTI_PLAIN, '2 and 4', null],
+];
+
+test('acceptedAnswers: specific single answers plus explicit variants', () => {
+    assert.deepEqual(L.acceptedAnswers(SINGLE), ['Paris', 'City of Light']);
+    assert.deepEqual(L.acceptedAnswers(VAGUE), []);
+    assert.deepEqual(L.acceptedAnswers(MULTI), ['2 and 4']);
+    assert.deepEqual(L.acceptedAnswers(MULTI_PLAIN), []);
+});
+
+test('matchesAccepted agrees with the server', () => {
+    for (const [question, typed, expected] of MATCH_CASES) {
+        assert.equal(L.matchesAccepted(question, typed), expected, typed);
+    }
+});
+
 test('client ids are unique and match the server format', () => {
     const ids = new Set(Array.from({ length: 200 }, () => L.newClientId('a')));
     assert.equal(ids.size, 200);

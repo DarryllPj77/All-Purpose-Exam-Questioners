@@ -3222,7 +3222,7 @@ body { padding: 0; }
 .quiz-head .exam-progress-meta { margin-top: var(--s-5); }
 
 #examContainer .exam-content { padding: 0; display: flex; flex-direction: column; gap: var(--s-4); }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .question-card {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card {
     margin: 0;
     padding: var(--s-6);
     border: 1px solid var(--c-border);
@@ -3230,21 +3230,21 @@ body { padding: 0; }
     background: var(--c-surface);
     overflow: visible;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .question-card::before { content: none; }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .question-header { margin-bottom: var(--s-4); gap: var(--s-3); }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .question-number {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card::before { content: none; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-header { margin-bottom: var(--s-4); gap: var(--s-3); }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-number {
     background: var(--c-primary-soft);
     color: var(--c-primary-2);
     box-shadow: none;
     font-weight: 600;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .back-button {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .back-button {
     margin: 0;
     min-height: 36px;
     background: transparent;
     border-color: var(--c-border-strong);
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .question-text { margin: 0; font-size: 19px; line-height: 1.6; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-text { margin: 0; font-size: 19px; line-height: 1.6; }
 
 .answers-card {
     padding: var(--s-3);
@@ -3270,14 +3270,14 @@ body { padding: 0; }
 .answers-card .choice-label { width: 36px; height: 36px; font-size: 14px; }
 .answers-card #trainingFeedback { margin: var(--s-3) var(--s-2) var(--s-2); }
 
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .navigation {
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .navigation {
     margin: 0;
     padding: 0;
     border: 0;
     flex-direction: row;
     justify-content: center;
 }
-:is(#examContainer, #practiceView, #mistakesView, #learnView) .nav-button { width: auto; min-width: 140px; min-height: 44px; font-weight: 500; }
+:is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .nav-button { width: auto; min-width: 140px; min-height: 44px; font-weight: 500; }
 
 /* Navigator panel */
 .quiz-panel {
@@ -3409,11 +3409,11 @@ body { padding: 0; }
     .app-bar { margin-bottom: var(--s-5); }
     .quiz-head .exam-header__row { align-items: flex-start; }
     .quiz-head .exam-timer-block { padding: 6px 6px 6px 12px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView) .question-card { padding: var(--s-5); }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView) .back-button { min-height: 44px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView) .question-text { font-size: 17px; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView) .navigation { flex-direction: row; }
-    :is(#examContainer, #practiceView, #mistakesView, #learnView) .nav-button { flex: 1; min-width: 0; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-card { padding: var(--s-5); }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .back-button { min-height: 44px; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .question-text { font-size: 17px; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .navigation { flex-direction: row; }
+    :is(#examContainer, #practiceView, #mistakesView, #learnView, #recallView) .nav-button { flex: 1; min-width: 0; }
     .quiz-panel .btn--full { width: 100%; }
     .app-bar__eyebrow { display: none; }
 }
@@ -4027,3 +4027,32 @@ kbd {
 
 /* .btn and .nav-button set display, which would beat the hidden attribute */
 .btn[hidden], .nav-button[hidden] { display: none !important; }
+
+/* ============================================================
+   Active recall
+   ============================================================ */
+.rc-seg--correct { background: var(--c-success); }
+.rc-seg--partial { background: var(--c-warning); }
+.rc-seg--incorrect { background: var(--c-danger); }
+.rc-seg--unseen { background: var(--c-border-strong); }
+.rc-last[data-rating="incorrect"] { background: var(--c-danger-soft); color: var(--c-danger-ink); }
+.rc-last[data-rating="partial"] { background: var(--c-warning-soft); color: var(--c-warning-ink); }
+.rc-last[data-rating="correct"] { background: var(--c-success-soft); color: var(--c-success-ink); }
+.rc-body { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-5); }
+.rc-typed { min-height: 96px; resize: vertical; font-size: 16px; line-height: 1.55; }
+.rc-reveal { align-self: flex-start; }
+.rc-match { margin-top: var(--s-2); font-size: 14px; color: var(--c-text-muted); }
+.rc-match[hidden] { display: none; }
+.rc-match--yes { color: var(--c-success-ink); }
+.rc-rate { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-3); }
+.rc-rate[hidden] { display: none; }
+.rc-rate__btn { border: 1px solid var(--c-border-strong); background: var(--c-surface-2); color: var(--c-text); }
+.rc-rate__btn kbd { margin-right: 4px; }
+.rc-rate__btn--incorrect:hover:not(:disabled) { background: var(--c-danger-soft); border-color: var(--c-danger); color: var(--c-danger-ink); }
+.rc-rate__btn--partial:hover:not(:disabled) { background: var(--c-warning-soft); border-color: var(--c-warning); color: var(--c-warning-ink); }
+.rc-rate__btn--correct:hover:not(:disabled),
+.rc-rate__btn--correct.is-suggested { background: var(--c-success-soft); border-color: var(--c-success); color: var(--c-success-ink); }
+@media (max-width: 640px) {
+    .rc-rate { grid-template-columns: 1fr; }
+    .rc-reveal { align-self: stretch; }
+}

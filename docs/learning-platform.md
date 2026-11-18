@@ -13,8 +13,8 @@ only what is implemented and verified; planned work is listed separately.
 | 2 | Flashcards | Committed (`a98df25`) |
 | 3 | Practice test; exam and training answers logged | Committed (`dd19277`) |
 | 4 | Mistake review | Committed (`a09cf44`) |
-| 5 | Learn mode | Committed |
-| 6 | Active recall | Planned |
+| 5 | Learn mode | Committed (`f55bad3`) |
+| 6 | Active recall | Committed |
 | 7 | Smart review (spaced repetition) | Planned |
 | 8 | Matching | Planned |
 | 9 | Code challenge | Planned |
@@ -32,8 +32,8 @@ only what is implemented and verified; planned work is listed separately.
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
-  study mode in `js/modes/` (`flashcards.js`, `learn.js`, `practice.js`,
-  `mistakes.js`).
+  study mode in `js/modes/` (`flashcards.js`, `learn.js`, `recall.js`,
+  `practice.js`, `mistakes.js`).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
   shell, opened from a tile in the dashboard's "Study modes" section or from
   the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
@@ -214,6 +214,34 @@ fire-and-forget and never affects the score or the results screen.
 * **Not included:** "I was right" overrides for typed answers; a near-miss
   typo counts as incorrect.
 
+## Active recall (Phase 6)
+
+* **No choices:** the question is shown alone. The learner may type an
+  answer (optional), reveals the reference answer with its explanation, and
+  rates themselves Incorrect, Partially correct or Correct (keys 1–3).
+* **Self-assessment decides.** No AI or fuzzy grading. When something was
+  typed, it is also compared with the accepted answers after
+  `normalizeText()` (case, quotes, punctuation, spacing, leading article):
+  a match is pointed out and "Correct" is highlighted, a mismatch asks the
+  learner to judge, and answers that can't be checked say so. The server
+  stores both the rating and the objective match (`autoMatched`).
+* **Accepted answers:** the correct choice's text when a question has a
+  single, specific answer, plus an optional `acceptedAnswers` list on the
+  question (up to 20 short strings, validated on import). Multi-answer and
+  "All of the above" style questions match only explicit `acceptedAnswers`.
+  Python (`recall_routes.accepted_answers`) and JS
+  (`Quizer.learning.acceptedAnswers`) are tested against one shared table.
+* **Hardest first:** sessions order questions by the last rating:
+  Incorrect, then Partially correct, then not yet tried, then Correct,
+  oldest first within each group.
+* **Records:** `question_progress.recall_rating` and each rating in the
+  answer log (mode `recall`, outcome = rating). An Incorrect recall reaches
+  Mistake Review; Partially correct does not.
+* **Resume:** the session (queue, position, ratings) is saved to
+  `study_sessions` (mode `recall`). No timer.
+* **Shared text rule:** `normalizeText` now lives in `js/core/learning.js`;
+  Learn uses the same function.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -243,6 +271,7 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/mistakes/<setId>/<questionId>/retry` | Grade a retry on the server (`selected`, `clientAttemptId`) |
 | POST | `/api/mistakes/reset` | Close open items for all sets, one set or one question; history is kept |
 | POST | `/api/learn/<setId>/<questionId>/answer` | Grade a Learn answer (`choice`, `written` or `recall`) and update mastery |
+| POST | `/api/recall/<setId>/<questionId>/rate` | Save an Active Recall self-assessment (`rating`, optional `text`) |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests
