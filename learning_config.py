@@ -81,6 +81,18 @@ PRACTICE: dict[str, Any] = {
 }
 
 
+# Code challenges: static analysis only. Nothing a learner or a question set
+# provides is ever executed; answers are compared with stored answers.
+CODE: dict[str, Any] = {
+    # Challenge kinds, in the order the setup screen lists them.
+    "challenges": ["output", "syntax", "bug", "complete", "explain", "concept", "choice"],
+    # Languages with highlighting; anything else is shown as plain code.
+    "languages": ["csharp", "java", "javascript", "python", "c", "cpp", "sql", "text"],
+    "max_code_chars": 20_000,
+    "max_output_chars": 5_000,
+}
+
+
 def public_config() -> dict[str, Any]:
     """Everything the browser needs, as plain JSON."""
     return {
@@ -113,5 +125,11 @@ def public_config() -> dict[str, Any]:
             "maxMinutes": PRACTICE["max_minutes"],
             "shuffleQuestionsByDefault": PRACTICE["shuffle_questions_by_default"],
             "shuffleAnswersByDefault": PRACTICE["shuffle_answers_by_default"],
+        },
+        "code": {
+            "challenges": CODE["challenges"],
+            "languages": CODE["languages"],
+            "maxCodeChars": CODE["max_code_chars"],
+            "maxOutputChars": CODE["max_output_chars"],
         },
     }

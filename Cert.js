@@ -307,6 +307,28 @@ const PROMPT_QUESTION_TYPE_CONFIG = Object.freeze({
             A: 'POST commonly submits a representation that creates a new subordinate resource.',
             C: 'PUT commonly creates or fully replaces the resource at the target URI.'
         }
+    },
+    code: {
+        responseType: 'single',
+        copyLabel: 'Copy Code-Challenge AI Prompt',
+        hint: 'The copied prompt will create code questions (C# unless your topic is another language), each with a snippet, a challenge type and one correct answer.',
+        instruction: 'Every question must be a CODE CHALLENGE with exactly ONE correct answer, a short snippet in `code`, its language in `language` and a `challenge` type.',
+        text: 'What does this program print?',
+        code: 'int total = 0;\nfor (int i = 1; i <= 4; i++)\n{\n    if (i % 2 == 0) continue;\n    total += i;\n}\nConsole.WriteLine(total);',
+        language: 'csharp',
+        challenge: 'output',
+        choices: ['4', '6', '10', '9'],
+        answers: ['A'],
+        descriptions: {
+            A: 'continue skips the even values 2 and 4, so only 1 + 3 is added, giving 4.'
+        },
+        extraRules: [
+            '- `challenge` must be one of: `output` (predict the output), `syntax` (find the syntax error), `bug` (find the logic bug), `complete` (choose what fills a ____ blank in the code), `explain` (choose the correct explanation), `concept` (identify the programming concept), `choice` (any other programming question). Use a mix of types.',
+            '- `language` must be one of: `csharp`, `java`, `javascript`, `python`, `c`, `cpp`, `sql`. Use `csharp` unless the topic is clearly about another language.',
+            '- Put ONLY code in `code`: no markdown fences, at most 25 lines, real line breaks and indentation. Inside `code`, write any backtick as \\` and any ${ as \\${.',
+            '- For `output` questions the correct choice must be the exact program output; use real line breaks for output with several lines.',
+            '- Every snippet must compile and behave exactly as the answer says, except `syntax` questions, which contain exactly one intended syntax error.'
+        ]
     }
 });
 
@@ -337,6 +359,11 @@ function buildAiPromptTemplate(type) {
         '    number: 1,',
         '    // Topic/Subtopic: Example topic',
         `    text: \`${config.text}\`,`,
+        ...(config.code ? [
+            `    code: \`${config.code}\`,`,
+            `    language: \`${config.language}\`,`,
+            `    challenge: \`${config.challenge}\`,`,
+        ] : []),
         '    choices: {',
         ...choiceLines,
         '    },',
@@ -357,7 +384,8 @@ function buildAiPromptTemplate(type) {
         '- Each answer description must explain why that specific choice is correct, not merely repeat the choice text.',
         `- Set \`responseType\` to \`${config.responseType}\` for every question.`,
         '- `maxSelections` must exactly equal the number of letters in `answer`.',
-        '- Use backticks (`) around all string values for `text`, `choices`, `answerDescriptions`, and `responseType` exactly as shown.',
+        ...(config.extraRules || []),
+        `- Use backticks (\`) around all string values for \`text\`, ${config.code ? '\`code\`, \`language\`, \`challenge\`, ' : ''}\`choices\`, \`answerDescriptions\`, and \`responseType\` exactly as shown.`,
         '- Each question must be DISTINCT in topic and wording.',
         '- Number questions sequentially starting at 1.',
         '',
@@ -583,7 +611,7 @@ function normalizeImportedQuestion(question, index) {
         acceptedAnswers = question.acceptedAnswers.map(a => a.trim());
     }
 
-    return Object.assign({}, question, {
+    const normalized = Object.assign({}, question, {
         text: question.text.trim(),
         choices,
         answer: answers,
@@ -591,6 +619,42 @@ function normalizeImportedQuestion(question, index) {
         responseType,
         maxSelections
     }, acceptedAnswers ? { acceptedAnswers } : {});
+    return normalizeCodeFields(normalized, question, label);
+}
+
+// Optional code-challenge fields (see js/core/code.js). Code is only ever
+// displayed; it is never run.
+function normalizeCodeFields(normalized, question, label) {
+    const codeApi = window.Quizer && window.Quizer.code;
+    delete normalized.code;
+    delete normalized.language;
+    delete normalized.challenge;
+    delete normalized.expectedOutput;
+    if (question.code != null) {
+        if (typeof question.code !== 'string' || question.code.length > 20000) {
+            throw new Error(`${label} code must be text of at most 20,000 characters.`);
+        }
+        const code = question.code.replace(/\r\n?/g, '\n').replace(/^(?:[ \t]*\n)+/, '').replace(/\s+$/, '');
+        if (code) normalized.code = code;
+    }
+    if (question.language != null) {
+        if (typeof question.language !== 'string') throw new Error(`${label} language must be text, such as csharp.`);
+        normalized.language = codeApi ? codeApi.languageOf(question.language) : question.language.trim().toLowerCase();
+    }
+    if (question.challenge != null) {
+        const kinds = codeApi ? Object.keys(codeApi.CHALLENGES) : [];
+        if (typeof question.challenge !== 'string' || (kinds.length && !kinds.includes(question.challenge.trim().toLowerCase()))) {
+            throw new Error(`${label} challenge must be one of: ${kinds.join(', ')}.`);
+        }
+        normalized.challenge = question.challenge.trim().toLowerCase();
+    }
+    if (question.expectedOutput != null) {
+        if (typeof question.expectedOutput !== 'string' || question.expectedOutput.length > 5000) {
+            throw new Error(`${label} expectedOutput must be text of at most 5,000 characters.`);
+        }
+        if (question.expectedOutput.trim()) normalized.expectedOutput = question.expectedOutput;
+    }
+    return normalized;
 }
 
 function importManualSet() {
@@ -1161,6 +1225,7 @@ function displayQuestion() {
     const responseInstruction = getQuestionResponseInstruction(question);
     if (responseInstruction) instructionText += `\n\n${responseInstruction}`;
     document.getElementById('questionText').innerText = instructionText;
+    if (window.Quizer && window.Quizer.code) window.Quizer.code.attach(document.getElementById('questionText'), question);
     
     const choicesContainer = document.getElementById('choices');
     choicesContainer.innerHTML = '';

@@ -302,6 +302,7 @@
             : cur.format === 'recall' ? 'Recall, then check yourself'
                 : (max > 1 ? `Choose ${max}` : 'Choose 1');
         $('lnText').textContent = q.text || '';
+        if (root.Quizer.code) root.Quizer.code.attach($('lnText'), q);
 
         // Format panes
         $('lnChoicePane').hidden = cur.format !== 'choice';

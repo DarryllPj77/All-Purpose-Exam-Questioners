@@ -198,6 +198,7 @@
         $('rcLast').textContent = last ? 'Last time: ' + LABEL[last] : 'First time';
         $('rcLast').dataset.rating = last || 'none';
         $('rcText').textContent = q.text || '';
+        if (root.Quizer.code) root.Quizer.code.attach($('rcText'), q);
 
         $('rcTyped').disabled = card.revealed;
         $('rcReveal').hidden = card.revealed;

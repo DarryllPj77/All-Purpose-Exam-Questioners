@@ -288,6 +288,7 @@
 
         const q = s.questions.get(id);
         $('fcFrontText').textContent = q.text || '';
+        if (root.Quizer.code) root.Quizer.code.attach($('fcFrontText'), q);
         const back = $('fcBackList');
         back.replaceChildren();
         cardBack(q).forEach((answer) => {
@@ -572,7 +573,12 @@
         // Tap flips; a horizontal swipe moves between cards.
         const card = $('fcCard');
         let startX = null; let startY = null; let swiped = false;
-        card.addEventListener('pointerdown', (e) => { startX = e.clientX; startY = e.clientY; swiped = false; });
+        // Gestures that start on a code block scroll the code instead.
+        const inCode = (e) => !!(e.target && e.target.closest && e.target.closest('.code-block'));
+        card.addEventListener('pointerdown', (e) => {
+            if (inCode(e)) { startX = null; return; }
+            startX = e.clientX; startY = e.clientY; swiped = false;
+        });
         card.addEventListener('pointerup', (e) => {
             if (startX === null) return;
             const dx = e.clientX - startX;
@@ -584,6 +590,7 @@
             }
         });
         card.addEventListener('click', (e) => {
+            if (inCode(e)) return;
             if (swiped) { swiped = false; e.preventDefault(); return; }
             flip();
         });

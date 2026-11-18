@@ -278,6 +278,7 @@
         $('rvMaturity').textContent = it.intervalDays ? `${maturityLabel(it.intervalDays)} · every ${it.intervalDays} day${it.intervalDays === 1 ? '' : 's'}` : 'First review';
         $('rvSetTitle').textContent = it.setTitle;
         $('rvText').textContent = q.text;
+        if (root.Quizer.code) root.Quizer.code.attach($('rvText'), q);
 
         $('rvChoicePane').hidden = recall;
         $('rvRecallPane').hidden = !recall;

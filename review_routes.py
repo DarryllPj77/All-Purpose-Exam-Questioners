@@ -104,6 +104,15 @@ def _tz_offset(raw: Any) -> int | None:
     return value if -MAX_TZ_OFFSET <= value <= MAX_TZ_OFFSET else None
 
 
+def _code_fields(q: dict[str, Any]) -> dict[str, Any]:
+    """Optional code-challenge fields, passed through when present."""
+    out: dict[str, Any] = {}
+    for key in ("code", "language", "challenge", "expectedOutput"):
+        if isinstance(q.get(key), str) and q.get(key):
+            out[key] = q[key]
+    return out
+
+
 def _public_question(q: dict[str, Any]) -> dict[str, Any]:
     answers = q.get("answer")
     answers = [str(a) for a in (answers if isinstance(answers, list) else [answers])]
@@ -111,6 +120,7 @@ def _public_question(q: dict[str, Any]) -> dict[str, Any]:
         "id": q.get("id"), "text": q.get("text") or "", "choices": q.get("choices") or {},
         "answer": answers, "answerDescriptions": q.get("answerDescriptions") or {},
         "maxSelections": q.get("maxSelections") or max(1, len(answers)),
+        **_code_fields(q),
     }
 
 

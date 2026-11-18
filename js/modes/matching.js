@@ -54,6 +54,8 @@
         const out = [];
         (questions || []).forEach((q) => {
             if (!q || !q.id || !q.text) return;
+            // "What does this print?" means nothing without its code.
+            if (typeof q.code === 'string' && q.code.trim()) return;
             const answer = answerText(q);
             const key = norm(q.text);
             if (!answer || !key || seen.has(key)) return;

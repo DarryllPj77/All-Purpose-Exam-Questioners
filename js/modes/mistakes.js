@@ -334,6 +334,7 @@
         $('mrSetTag').textContent = item.setTitle;
         $('mrNumber').textContent = multi ? `Choose ${max}` : 'Choose 1';
         $('mrText').textContent = q.text;
+        if (root.Quizer.code) root.Quizer.code.attach($('mrText'), q);
         $('mrStreakNow').textContent = `Correct in a row: ${item.retryStreak} of ${item.needed}`;
 
         const box = $('mrChoices');

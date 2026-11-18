@@ -66,6 +66,7 @@
                 <a class="side-nav__link" href="#recall" data-nav-target="recallView" data-open-view="recall"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 0 0-5.8 1A3 3 0 0 0 4 11a3 3 0 0 0 2 5 3 3 0 0 0 6 1V5z"/><path d="M12 5a3 3 0 0 1 5.8 1A3 3 0 0 1 20 11a3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg><span>Active recall</span></a>
                 <a class="side-nav__link" href="#review" data-nav-target="reviewView" data-open-view="review"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg><span>Smart review</span></a>
                 <a class="side-nav__link" href="#matching" data-nav-target="matchView" data-open-view="matching"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/><path d="m15 12 2 2 2-2"/></svg><span>Matching</span></a>
+                <a class="side-nav__link" href="#code" data-nav-target="codeView" data-open-view="code"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/><path d="m14 4-4 16"/></svg><span>Code challenge</span></a>
                 <a class="side-nav__link" href="#practice" data-nav-target="practiceView" data-open-view="practice"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="m9 13 1.5 1.5L14 11"/></svg><span>Practice test</span></a>
                 <a class="side-nav__link" href="#mistakes" data-nav-target="mistakesView" data-open-view="mistakes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span>Mistake review</span></a>
                 <p class="side-nav__label">Your data</p>
@@ -228,6 +229,10 @@
                             <span class="prompt-type-option__title">Multiple Select</span>
                             <span class="prompt-type-option__hint">Choose exactly N choices</span>
                         </button>
+                        <button type="button" class="prompt-type-option" data-prompt-type="code" role="radio" aria-checked="false" onclick="selectPromptQuestionType('code')">
+                            <span class="prompt-type-option__title">Code Challenge</span>
+                            <span class="prompt-type-option__hint">Code snippet, C# by default</span>
+                        </button>
                     </div>
                     <p id="promptTypeHint" class="prompt-type-hint" aria-live="polite">The copied prompt will require exactly one correct answer per question.</p>
                 </fieldset>
@@ -295,6 +300,15 @@
                         <span class="mode-tile__title">Matching</span>
                         <span class="mode-tile__desc">Pair each question with its answer. Play relaxed, or against the clock for a best time.</span>
                         <span class="mode-tile__meta">Uses your active question set</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
+                <button type="button" class="mode-tile" data-open-view="code">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/><path d="m14 4-4 16"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Code challenge</span>
+                        <span class="mode-tile__desc">Predict output, spot bugs and syntax errors, complete code. Nothing is executed.</span>
+                        <span class="mode-tile__meta">Questions with code in your active set</span>
                     </span>
                     <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
                 </button>
@@ -1251,6 +1265,112 @@
         </div>
         <p class="sr-only" id="mtLive" aria-live="polite"></p>
     </section>
+
+    <section class="mode-view mode-view--wide" id="codeView" aria-labelledby="ccTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Code challenge</span>
+                <h1 id="ccTitle">Code challenge</h1>
+                <p class="mode-head__meta">Read the code, then answer. Nothing is run: answers are checked against the set's answer key.</p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--secondary btn--sm" id="ccExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="ccState" role="status" hidden></div>
+
+        <div class="card pt-setup cc-intro" id="ccIntro" hidden>
+            <header class="card-head">
+                <h2>Set up a session</h2>
+                <p id="ccSummary"></p>
+            </header>
+            <div class="pt-setup__grid">
+                <fieldset class="pt-field">
+                    <legend class="field-label">Challenge types</legend>
+                    <div class="cc-kinds" id="ccKinds"></div>
+                </fieldset>
+                <div class="pt-field">
+                    <div class="pt-field">
+                        <label class="field-label" for="ccCount">Questions</label>
+                        <select class="text-input mr-select" id="ccCount">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="0">All of them</option>
+                        </select>
+                    </div>
+                    <fieldset class="pt-field">
+                        <legend class="field-label">Options</legend>
+                        <label class="pt-check"><input type="checkbox" id="ccShuffle"> <span>Shuffle questions</span></label>
+                        <label class="pt-check"><input type="checkbox" id="ccTypeOutput"> <span>Type the output for "Predict the output"</span></label>
+                        <p class="pt-hint">Typed output must match exactly, except for spaces at line ends and blank lines at the start or end.</p>
+                    </fieldset>
+                </div>
+            </div>
+            <div class="pt-setup__actions">
+                <button type="button" class="btn btn--secondary" id="ccResume" hidden>Continue</button>
+                <button type="button" class="btn btn--primary" id="ccStart">Start</button>
+            </div>
+        </div>
+
+        <div class="ln-question cc-session" id="ccSession" hidden>
+            <div class="pt-runhead">
+                <div class="pt-runhead__row">
+                    <span class="pt-runhead__label" id="ccPos">Question 1</span>
+                    <button type="button" class="btn btn--ghost btn--sm" id="ccStop">Pause</button>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="ccFill"></div>
+                </div>
+            </div>
+            <div class="question-card cc-card">
+                <div class="question-header">
+                    <span class="ln-stage" id="ccKind">Multiple choice</span>
+                    <span class="pt-type" id="ccLang"></span>
+                </div>
+                <div class="question-text" id="ccText"></div>
+            </div>
+            <div class="answers-card">
+                <div id="ccChoicePane"><div class="choices" id="ccChoices"></div></div>
+                <div class="cc-pane" id="ccOutputPane" hidden>
+                    <label class="field-label" for="ccOutput">Type the exact output</label>
+                    <textarea class="text-input cc-output-input" id="ccOutput" rows="5" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="ccOutputHint"></textarea>
+                    <p class="pt-hint" id="ccOutputHint">One line per printed line. Ctrl+Enter checks.</p>
+                </div>
+                <div class="pt-feedback" id="ccFeedback" role="status" hidden></div>
+            </div>
+            <div class="navigation">
+                <button type="button" class="nav-button" id="ccCheck">Check answer</button>
+                <button type="button" class="nav-button" id="ccNext" hidden>Next question</button>
+            </div>
+            <p class="pt-hint">Keys: A&ndash;D choose, Enter check and continue.</p>
+        </div>
+
+        <div class="ln-round cc-done" id="ccDone" hidden>
+            <section class="result-hero" data-tone="passed">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Session complete</span>
+                    <h2 id="ccDoneHeading" tabindex="-1">Results</h2>
+                    <p id="ccDoneText"></p>
+                </div>
+            </section>
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">Score</span><div class="number" id="ccDoneScore">0%</div><span class="score-card__caption">This session</span></div>
+                <div class="score-card"><span class="score-card__label">Correct</span><div class="number" id="ccDoneCorrect">0</div><span class="score-card__caption">Answered right</span></div>
+                <div class="score-card"><span class="score-card__label">Missed</span><div class="number" id="ccDoneIncorrect">0</div><span class="score-card__caption">Also in Mistake review</span></div>
+            </div>
+            <section class="card rv-panel" aria-labelledby="ccByKindTitle">
+                <h2 id="ccByKindTitle" class="rv-panel__title">By challenge type</h2>
+                <ul class="cc-bykind" id="ccDoneByKind"></ul>
+            </section>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="ccRetry">Retry missed</button>
+                <button type="button" class="btn btn--secondary" id="ccAgain">New session</button>
+                <button type="button" class="btn btn--ghost" id="ccDoneExit">Back to dashboard</button>
+            </div>
+        </div>
+        <p class="sr-only" id="ccLive" aria-live="polite"></p>
+    </section>
         </div>
     </div>
 
@@ -1296,6 +1416,7 @@
     </div>
 
     <script src="js/core/learning.js"></script>
+    <script src="js/core/code.js"></script>
     <script src="questions.js"></script>
     <script src="Cert.js"></script>
     <script src="js/shell.js"></script>
@@ -1306,5 +1427,6 @@
     <script src="js/modes/recall.js"></script>
     <script src="js/modes/review.js"></script>
     <script src="js/modes/matching.js"></script>
+    <script src="js/modes/code.js"></script>
 </body>
 </html>

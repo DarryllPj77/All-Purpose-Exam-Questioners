@@ -16,8 +16,8 @@ only what is implemented and verified; planned work is listed separately.
 | 5 | Learn mode | Committed (`f55bad3`) |
 | 6 | Active recall | Committed (`a4458d6`) |
 | 7 | Smart review (spaced repetition) | Committed (`3827276`) |
-| 8 | Matching | Implemented, not yet committed |
-| 9 | Code challenge | Planned |
+| 8 | Matching | Committed (`bca38dc`) |
+| 9 | Code challenge | Implemented, not yet committed |
 | 10 | Unified dashboard | Planned |
 
 ## Architecture
@@ -30,10 +30,11 @@ only what is implemented and verified; planned work is listed separately.
   `GET /api/learning/config`; nothing is duplicated in JavaScript.
 * **Frontend:** plain scripts, no build step, loaded in this order:
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
+  `js/core/code.js` (code display and highlighting, `Quizer.code`),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), then one file per
   study mode in `js/modes/` (`flashcards.js`, `learn.js`, `recall.js`,
-  `review.js`, `practice.js`, `mistakes.js`).
+  `review.js`, `practice.js`, `mistakes.js`, `matching.js`, `code.js`).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
   shell, opened from a tile in the dashboard's "Study modes" section or from
   the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
@@ -298,6 +299,48 @@ fire-and-forget and never affects the score or the results screen.
 * **No resume:** a round takes a minute or two, so a stopped or abandoned
   round is not saved; nothing is logged until a round is finished.
 
+## Code challenge (Phase 9)
+
+* **Content model (no migration):** four optional question fields, stored in
+  the set's existing JSON: `code` (the snippet, up to 20,000 characters),
+  `language` (`csharp`, `java`, `javascript`, `python`, `c`, `cpp`, `sql`;
+  aliases such as `C#`, `js`, `py` are accepted; anything else shows as plain
+  code), `challenge` and `expectedOutput`. Questions without them behave
+  exactly as before. The importer validates the fields, and the AI prompt
+  has a fourth type, "Code Challenge" (C# unless the topic is another
+  language).
+* **Challenge types** (`learning_config.CODE`): predict the output, find the
+  syntax error, find the bug, complete the code, explain the code, identify
+  the concept, multiple choice. A question with code but no type counts as
+  multiple choice.
+* **Security: nothing is executed.** Code is only displayed, as text nodes
+  (never parsed as HTML). Answers are graded on the server
+  (`code_routes.py`) against the stored answer: choices must match exactly,
+  like every other mode. For "predict the output" the learner can type the
+  output instead; it must equal `expectedOutput` (or the single correct
+  choice) after unifying line endings and ignoring spaces at line ends and
+  blank lines at the start and end. Letter case and everything else count.
+  Any future execution would need an isolated sandbox with resource limits;
+  none exists.
+* **Display everywhere:** `Quizer.code.attach()` puts a code block after the
+  question text in every mode (exam, training, practice, learn, recall,
+  review, mistakes, flashcards, code challenge). Blocks have line numbers, a
+  small built-in highlighter (keywords, strings, comments, numbers,
+  preprocessor lines), a Copy button that also works on plain-HTTP pages,
+  and horizontal scrolling inside the block so long lines never widen the
+  page. On flashcards, taps and swipes that start on code scroll the code
+  instead of flipping or changing the card. Matching skips questions with
+  code, since "What does this print?" means nothing without it.
+* **Sessions:** choose challenge types, 10 / 20 / all questions, shuffle,
+  and whether to type output. The queue, position and results are saved
+  after every answer (`study_sessions` mode `code`), so a session can be
+  paused and continued, even after a reload. The summary shows the score by
+  challenge type and offers to retry the missed questions.
+* **Integration:** each answer is logged with mode `code`; misses reach
+  Mistake Review (which shows the code) and bring Smart Review forward.
+* **Sample set:** "Add a C# sample set" (shown when a set has no code
+  questions) adds nine C# questions covering every challenge type.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -330,6 +373,7 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/recall/<setId>/<questionId>/rate` | Save an Active Recall self-assessment (`rating`, optional `text`) |
 | GET | `/api/review/overview` | Due, overdue, upcoming, maturity and 14-day history (`tzOffset`, optional `setId`) |
 | POST | `/api/review/<setId>/<questionId>/answer` | Grade a review (`choice` or `recall`) and reschedule it |
+| POST | `/api/code/<setId>/<questionId>/answer` | Grade a code challenge (`choice`, or typed `output` for output challenges); nothing is executed |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
 ## Tests
@@ -344,9 +388,14 @@ and delete them afterwards. They are skipped if no database is reachable.
 
 ## Known limitations
 
-* Questions are multiple choice only; written answers, code and difficulty or
-  topic fields are planned as optional additions in later phases.
+* Questions are multiple choice only (code challenges add typed output);
+  written answers and difficulty or topic fields are not supported yet.
 * Practice tests have no difficulty filter because questions carry no
   difficulty field.
 * Matching skips questions whose answer is long or vague ("All of the
   above"), so a set made mostly of those may not have enough pairs.
+* The highlighter is a small tokenizer, not a full parser: it colours
+  keywords, strings, comments and numbers, and does not understand
+  regular expressions or nested string interpolation.
+* Code challenge answers are checked against the answer key; the app cannot
+  tell whether a question's own snippet really behaves as its answer says.

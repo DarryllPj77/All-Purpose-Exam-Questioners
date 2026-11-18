@@ -96,6 +96,15 @@ def _reconcile(uid: int, set_id: str | None) -> None:
         )
 
 
+def _code_fields(q: dict[str, Any]) -> dict[str, Any]:
+    """Optional code-challenge fields, passed through when present."""
+    out: dict[str, Any] = {}
+    for key in ("code", "language", "challenge", "expectedOutput"):
+        if isinstance(q.get(key), str) and q.get(key):
+            out[key] = q[key]
+    return out
+
+
 def _public_question(q: dict[str, Any]) -> dict[str, Any]:
     answers = _answer_list(q.get("answer"))
     return {
@@ -105,6 +114,7 @@ def _public_question(q: dict[str, Any]) -> dict[str, Any]:
         "answer": answers,
         "answerDescriptions": q.get("answerDescriptions") or {},
         "maxSelections": q.get("maxSelections") or max(1, len(answers)),
+        **_code_fields(q),
     }
 
 

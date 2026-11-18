@@ -4189,3 +4189,131 @@ kbd {
     .mt-tile { min-height: 48px; padding: var(--s-2) var(--s-3); font-size: 14px; }
     .mt-board .pt-runhead__row { flex-wrap: wrap; }
 }
+
+/* ============================================================
+   Code blocks (any mode) and Code challenge
+   ============================================================ */
+.code-block {
+    margin: 0 0 var(--s-5);
+    min-width: 0;
+    max-width: 100%;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    background: var(--c-code-bg);
+    overflow: hidden;
+    text-align: left;
+}
+.code-block__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: 6px 8px 6px 14px;
+    border-bottom: 1px solid var(--c-border);
+    font: 600 12px/1 var(--ff-sans);
+    letter-spacing: .04em;
+    color: var(--c-text-soft);
+}
+.code-block__copy {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-text-muted);
+    font: 600 12.5px/1 var(--ff-sans);
+    cursor: pointer;
+}
+.code-block__copy:hover { color: var(--c-text); border-color: var(--c-border-strong); }
+.code-block__copy:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.code-block__pre {
+    margin: 0;
+    padding: 12px 0;
+    overflow-x: auto;
+    border: 0;
+    background: transparent;
+    color: var(--c-text);
+    font-family: var(--ff-mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    white-space: pre;
+    tab-size: 4;
+    counter-reset: code-line;
+}
+.code-block__pre:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.code-block__pre code { display: block; min-width: max-content; padding: 0; background: none; font: inherit; color: inherit; }
+.code-line { display: block; padding-right: 16px; }
+.code-line::before {
+    counter-increment: code-line;
+    content: counter(code-line);
+    display: inline-block;
+    width: 2.5ch;
+    margin-right: 14px;
+    padding-left: 12px;
+    text-align: right;
+    color: var(--c-text-soft);
+    opacity: .65;
+    user-select: none;
+}
+.tok-keyword { color: var(--c-primary-ink); font-weight: 600; }
+.tok-string { color: var(--c-success-ink); }
+.tok-number { color: var(--c-warning-ink); }
+.tok-comment { color: var(--c-text-soft); font-style: italic; }
+.tok-meta { color: var(--c-danger-ink); }
+.fc-face .code-block { margin-top: var(--s-3); }
+
+.cc-intro[hidden], .cc-session[hidden], .cc-done[hidden], .cc-pane[hidden] { display: none; }
+.cc-kinds { display: flex; flex-direction: column; }
+.cc-card, .cc-session .answers-card { min-width: 0; }
+.cc-output-input {
+    width: 100%;
+    min-height: 120px;
+    margin-top: var(--s-2);
+    font-family: var(--ff-mono);
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+    tab-size: 4;
+}
+.cc-output { margin: var(--s-3) 0; min-width: 0; }
+.cc-output__label {
+    margin: 0 0 4px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--c-text-soft);
+}
+.cc-output__pre {
+    margin: 0;
+    padding: 10px 14px;
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-sm);
+    background: var(--c-code-bg);
+    color: var(--c-text);
+    font-family: var(--ff-mono);
+    font-size: 13.5px;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-x: auto;
+}
+.cc-output__pre:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.choice-content--code { font-family: var(--ff-mono); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cc-bykind { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: grid; gap: 6px; }
+.cc-bykind li {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: 10px 14px;
+    border-radius: var(--r-sm);
+    background: var(--c-surface-2, var(--c-input));
+}
+@media (min-width: 769px) {
+    .prompt-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+    .code-block__pre { font-size: 12.5px; }
+    .code-line::before { margin-right: 10px; padding-left: 8px; }
+}

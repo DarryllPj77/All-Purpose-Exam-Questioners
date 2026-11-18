@@ -17,6 +17,7 @@ const MODE_VIEWS = [
     { key: 'practice', label: 'Practice test' },
     { key: 'mistakes', label: 'Mistake review' },
     { key: 'matching', label: 'Matching' },
+    { key: 'codeChallenge', label: 'Code challenge' },
 ];
 
 /** Close every open study-mode view except `exceptKey` (each saves its own state). */

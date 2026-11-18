@@ -435,6 +435,7 @@
         $('ptNumber').textContent = `Question ${run.current + 1} of ${total}`;
         $('ptTypeTag').textContent = multi ? `Choose ${max}` : 'Choose 1';
         $('ptText').textContent = q.text || '';
+        if (root.Quizer.code) root.Quizer.code.attach($('ptText'), q);
 
         const box = $('ptChoices');
         box.setAttribute('role', multi ? 'group' : 'radiogroup');

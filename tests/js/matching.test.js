@@ -22,6 +22,11 @@ test('pairable keeps specific answers, joins multi-answers, drops vague and repe
     assert.equal(M.answerText({ choices: { A: 'x'.repeat(200) }, answer: ['A'] }), null);
 });
 
+test('questions with a code snippet are not used for matching', () => {
+    const p = M.pairable([Q('q_c', 'What does this print?', ['A'], { A: '4', B: '6' })].map((q) => Object.assign(q, { code: 'Console.WriteLine(4);' })));
+    assert.equal(p.length, 0);
+});
+
 test('buildRound shuffles both columns and keeps every pair', () => {
     let seed = 3;
     const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
