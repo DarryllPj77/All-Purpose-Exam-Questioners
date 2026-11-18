@@ -250,7 +250,8 @@ class StaticFilesTest(unittest.TestCase):
         for path in ("/", "/Cert.css", "/Cert.js", "/questions.js", "/js/core/learning.js", "/js/shell.js",
                      "/js/modes/flashcards.js", "/js/modes/practice.js",
                      "/js/modes/mistakes.js", "/js/modes/learn.js",
-                     "/js/modes/recall.js", "/js/modes/review.js"):
+                     "/js/modes/recall.js", "/js/modes/review.js",
+                     "/js/modes/matching.js"):
             with client.get(path) as res:
                 self.assertEqual(res.status_code, 200, path)
         for path in ("/.env", "/server.py", "/schema.sql", "/.git/config", "/learning_config.py",

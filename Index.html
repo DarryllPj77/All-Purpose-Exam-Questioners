@@ -65,6 +65,7 @@
                 <a class="side-nav__link" href="#learn" data-nav-target="learnView" data-open-view="learn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9 12 4l10 5-10 5z"/><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg><span>Learn</span></a>
                 <a class="side-nav__link" href="#recall" data-nav-target="recallView" data-open-view="recall"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 0 0-5.8 1A3 3 0 0 0 4 11a3 3 0 0 0 2 5 3 3 0 0 0 6 1V5z"/><path d="M12 5a3 3 0 0 1 5.8 1A3 3 0 0 1 20 11a3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></svg><span>Active recall</span></a>
                 <a class="side-nav__link" href="#review" data-nav-target="reviewView" data-open-view="review"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M3 10h18"/><path d="m9 15 2 2 4-4"/></svg><span>Smart review</span></a>
+                <a class="side-nav__link" href="#matching" data-nav-target="matchView" data-open-view="matching"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/><path d="m15 12 2 2 2-2"/></svg><span>Matching</span></a>
                 <a class="side-nav__link" href="#practice" data-nav-target="practiceView" data-open-view="practice"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6"/><path d="m9 13 1.5 1.5L14 11"/></svg><span>Practice test</span></a>
                 <a class="side-nav__link" href="#mistakes" data-nav-target="mistakesView" data-open-view="mistakes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="m9 12 2 2 4-4"/></svg><span>Mistake review</span></a>
                 <p class="side-nav__label">Your data</p>
@@ -285,6 +286,15 @@
                         <span class="mode-tile__title">Active recall</span>
                         <span class="mode-tile__desc">Answer without choices, reveal, and rate yourself. Hard questions come first next time.</span>
                         <span class="mode-tile__meta" id="rcTileMeta">Uses your active question set</span>
+                    </span>
+                    <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
+                </button>
+                <button type="button" class="mode-tile" data-open-view="matching">
+                    <span class="mode-tile__icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/><path d="m15 12 2 2 2-2"/></svg></span>
+                    <span class="mode-tile__body">
+                        <span class="mode-tile__title">Matching</span>
+                        <span class="mode-tile__desc">Pair each question with its answer. Play relaxed, or against the clock for a best time.</span>
+                        <span class="mode-tile__meta">Uses your active question set</span>
                     </span>
                     <span class="mode-tile__go" aria-hidden="true">&#8250;</span>
                 </button>
@@ -1157,6 +1167,90 @@
         </div>
         <p class="sr-only" id="rvLive" aria-live="polite"></p>
     </section>
+
+    <section class="mode-view mode-view--wide" id="matchView" aria-labelledby="mtTitle" hidden>
+        <header class="mode-head">
+            <div class="mode-head__titles">
+                <span class="mode-head__eyebrow">Matching</span>
+                <h1 id="mtTitle">Matching</h1>
+                <p class="mode-head__meta">Pick a question, then its answer. Either side first works.</p>
+            </div>
+            <div class="mode-head__actions">
+                <button type="button" class="btn btn--secondary btn--sm" id="mtExit"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg><span>Exit</span></button>
+            </div>
+        </header>
+
+        <div class="ui-state ui-state--loading" id="mtState" role="status" hidden></div>
+
+        <div class="card pt-setup mt-intro" id="mtIntro" hidden>
+            <header class="card-head">
+                <h2>Set up a round</h2>
+                <p id="mtPairCount"></p>
+            </header>
+            <div class="pt-setup__grid">
+                <fieldset class="pt-field">
+                    <legend class="field-label">Round size</legend>
+                    <label class="pt-check mt-size"><input type="radio" name="mtSize" value="4"> <span>4 pairs</span><span class="mt-size__note" id="mtBest_4"></span></label>
+                    <label class="pt-check mt-size"><input type="radio" name="mtSize" value="6"> <span>6 pairs</span><span class="mt-size__note" id="mtBest_6"></span></label>
+                    <label class="pt-check mt-size"><input type="radio" name="mtSize" value="8"> <span>8 pairs</span><span class="mt-size__note" id="mtBest_8"></span></label>
+                </fieldset>
+                <fieldset class="pt-field">
+                    <legend class="field-label">Pace</legend>
+                    <label class="pt-check"><input type="radio" name="mtMode" value="relaxed"> <span>Relaxed, no clock</span></label>
+                    <label class="pt-check"><input type="radio" name="mtMode" value="timed"> <span>Timed, beat your best</span></label>
+                    <p class="pt-hint">Only short, specific answers are used. Choices like "All of the above" are left out.</p>
+                </fieldset>
+            </div>
+            <div class="pt-setup__actions">
+                <button type="button" class="btn btn--primary" id="mtStart">Start round</button>
+            </div>
+        </div>
+
+        <div class="mt-board" id="mtBoard" hidden>
+            <div class="pt-runhead">
+                <div class="pt-runhead__row">
+                    <span class="pt-runhead__label"><span id="mtProgress">0 matched</span> <span class="mt-misses" id="mtMisses">0 misses</span></span>
+                    <span class="pt-timer" id="mtClockWrap" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M10 2h4"/></svg><span class="sr-only">Time </span><span id="mtClock">0:00.0</span></span>
+                    <button type="button" class="btn btn--ghost btn--sm" id="mtQuit">Stop round</button>
+                </div>
+                <div class="progress-bar" role="progressbar" aria-label="Pairs matched" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-fill" id="mtFill"></div>
+                </div>
+            </div>
+            <div class="mt-columns">
+                <div class="mt-col" role="group" aria-labelledby="mtLeftLabel">
+                    <h2 class="mt-col__label" id="mtLeftLabel">Questions</h2>
+                    <div class="mt-list" id="mtLeft"></div>
+                </div>
+                <div class="mt-col" role="group" aria-labelledby="mtRightLabel">
+                    <h2 class="mt-col__label" id="mtRightLabel">Answers</h2>
+                    <div class="mt-list" id="mtRight"></div>
+                </div>
+            </div>
+            <p class="pt-hint mt-help">Press Escape to clear a selection.</p>
+        </div>
+
+        <div class="ln-round mt-done" id="mtDone" hidden>
+            <section class="result-hero" data-tone="passed">
+                <div class="result-hero__copy">
+                    <span class="result-eyebrow">Round complete</span>
+                    <h2 id="mtDoneHeading" tabindex="-1">All matched</h2>
+                    <p id="mtDoneText"></p>
+                </div>
+            </section>
+            <div class="score-details mr-stats">
+                <div class="score-card"><span class="score-card__label">Time</span><div class="number" id="mtDoneTime">0:00</div><span class="score-card__caption" id="mtDoneTimeNote"></span></div>
+                <div class="score-card"><span class="score-card__label">Accuracy</span><div class="number" id="mtDoneAccuracy">0%</div><span class="score-card__caption">Right on each try</span></div>
+                <div class="score-card"><span class="score-card__label">Misses</span><div class="number" id="mtDoneMisses">0</div><span class="score-card__caption">Missed pairs go to Mistake review</span></div>
+            </div>
+            <div class="pt-results__actions">
+                <button type="button" class="btn btn--primary" id="mtAgain">Play again</button>
+                <button type="button" class="btn btn--secondary" id="mtSettings">Change settings</button>
+                <button type="button" class="btn btn--ghost" id="mtDoneExit">Back to dashboard</button>
+            </div>
+        </div>
+        <p class="sr-only" id="mtLive" aria-live="polite"></p>
+    </section>
         </div>
     </div>
 
@@ -1211,5 +1305,6 @@
     <script src="js/modes/learn.js"></script>
     <script src="js/modes/recall.js"></script>
     <script src="js/modes/review.js"></script>
+    <script src="js/modes/matching.js"></script>
 </body>
 </html>

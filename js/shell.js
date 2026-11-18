@@ -16,6 +16,7 @@ const MODE_VIEWS = [
     { key: 'review', label: 'Smart review' },
     { key: 'practice', label: 'Practice test' },
     { key: 'mistakes', label: 'Mistake review' },
+    { key: 'matching', label: 'Matching' },
 ];
 
 /** Close every open study-mode view except `exceptKey` (each saves its own state). */

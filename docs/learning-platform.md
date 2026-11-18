@@ -15,8 +15,8 @@ only what is implemented and verified; planned work is listed separately.
 | 4 | Mistake review | Committed (`a09cf44`) |
 | 5 | Learn mode | Committed (`f55bad3`) |
 | 6 | Active recall | Committed (`a4458d6`) |
-| 7 | Smart review (spaced repetition) | Committed |
-| 8 | Matching | Planned |
+| 7 | Smart review (spaced repetition) | Committed (`3827276`) |
+| 8 | Matching | Implemented, not yet committed |
 | 9 | Code challenge | Planned |
 | 10 | Unified dashboard | Planned |
 
@@ -272,6 +272,32 @@ fire-and-forget and never affects the score or the results screen.
 * **No resume needed:** each answer is scheduled the moment it is checked,
   so stopping loses nothing; the next visit continues with what is due.
 
+## Matching (Phase 8)
+
+* **Pairs come from existing questions** (`js/modes/matching.js`, no new
+  backend): question text on the left, the text of its correct answer on
+  the right (several correct answers are joined with "; "). Only short,
+  specific answers are used: answers over 120 characters, "All of the
+  above", "Both", "Neither", "None..." and repeated question texts are left
+  out. A set needs at least 2 pairable questions.
+* **Identical labels are safe:** pairs are tracked by question id, and an
+  answer tile whose text is the same as the correct answer is also
+  accepted. Two questions both answered "True" can be matched either way,
+  so a round can always be finished.
+* **Input:** pick a question then an answer, or an answer then a question.
+  Every tile is a button, so mouse, touch and keyboard (Tab, Enter, Space)
+  all work; Escape clears a selection. No drag-and-drop is needed. A wrong
+  pair flashes on both tiles and only adds to the miss count.
+* **Rounds:** 4, 6 or 8 pairs; relaxed (no clock) or timed. Per round size
+  the app keeps plays, last and best accuracy, and a best time from timed
+  rounds only (`study_sessions` mode `matching`; the last size and pace are
+  remembered). Accuracy is matches divided by tries.
+* **Answer log:** each pair is logged with mode `matching`: correct if
+  matched on the first try, otherwise incorrect, so missed pairs reach
+  Mistake Review and pull Smart Review forward like any other miss.
+* **No resume:** a round takes a minute or two, so a stopped or abandoned
+  round is not saved; nothing is logged until a round is finished.
+
 ## Grading
 
 `Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
@@ -322,3 +348,5 @@ and delete them afterwards. They are skipped if no database is reachable.
   topic fields are planned as optional additions in later phases.
 * Practice tests have no difficulty filter because questions carry no
   difficulty field.
+* Matching skips questions whose answer is long or vague ("All of the
+  above"), so a set made mostly of those may not have enough pairs.
