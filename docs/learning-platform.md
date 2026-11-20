@@ -18,7 +18,8 @@ only what is implemented and verified; planned work is listed separately.
 | 7 | Smart review (spaced repetition) | Committed (`3827276`) |
 | 8 | Matching | Committed (`bca38dc`) |
 | 9 | Code challenge | Committed (`27916ea`) |
-| 10 | Unified dashboard | Implemented, not yet committed |
+| 10 | Unified dashboard | Committed (`0fbd58a`) |
+| 11 | Testing, optimisation and QA | Implemented, not yet committed |
 
 ## Architecture
 
@@ -31,6 +32,7 @@ only what is implemented and verified; planned work is listed separately.
 * **Frontend:** plain scripts, no build step, loaded in this order:
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `js/core/code.js` (code display and highlighting, `Quizer.code`),
+  `js/core/literal.js` (safe parser for pasted question arrays),
   `questions.js`, `Cert.js` (existing exam and training engine),
   `js/shell.js` (sidebar, header and question navigator), `js/progress.js`
   (the dashboard's "Your progress" card), then one file per
@@ -383,6 +385,54 @@ fire-and-forget and never affects the score or the results screen.
 * **Not shown, on purpose:** topic performance (questions have no topic
   field) and mastery over time (stage changes are not stored as history).
   Neither is estimated.
+
+## Quality checks (Phase 11)
+
+What was checked, how, and what changed. Every result below was measured
+or run, not estimated.
+
+* **Database connections.** Every query used to open a new PostgreSQL
+  connection (~30 ms locally, more over a network); the dashboard opened
+  nine. `db.py` now keeps a small per-process pool (default 10, `DB_POOL_MAX`;
+  `0` turns it off). Callers are unchanged: each `get_conn()` still commits
+  or rolls back before the connection goes back. Idle connections are
+  checked before reuse and broken ones are dropped, so a database restart
+  costs only a reconnect (tested by terminating a backend). Measured with
+  the Flask test client: dashboard 243 ms to 4.5 ms, mistakes 168 ms to
+  2.7 ms, review overview 111 ms to 2.7 ms, learn answer 57 ms to 1.3 ms.
+  The Python suite went from about 57 s to 13 s.
+* **Import parser.** Pasted question arrays were run with `new Function`,
+  so a pasted array could run script in the page. `js/core/literal.js` now
+  reads them as data only: arrays, objects, strings (backticks included),
+  numbers, true / false / null, comments and trailing commas. `${...}` in a
+  backtick string stays plain text. Anything else (calls, operators,
+  identifiers) is refused with its line number, and `__proto__` keys are
+  plain data. The existing repair step for stray backticks still runs.
+* **Keyboard.** In Smart review, Mistake review and Learn, Enter on a
+  chosen answer now checks it, as in Code challenge (Space still toggles).
+  Tab reaches the skip link first. A script focused every visible control
+  on the dashboard (67) and in every mode, set-up and running, and each
+  shows a focus ring (the flashcard draws its ring on the card face).
+* **Contrast, overflow and targets.** A script measured every visible text
+  element against its real background, sideways overflow, and control
+  sizes on the dashboard and every mode (set-up and running) at 1440, 768
+  and 390 px, plus the exam at 390 px. Findings fixed: soft text on a
+  selected row (4.40:1, now muted text at about 6:1); on touch widths the
+  drawer links, icon buttons, skip link and code Copy button are now 44 px.
+  No overflow at any width.
+* **Reduced motion.** A global rule cuts animations and transitions to
+  near zero and stops loops; hover lifts are also off under it.
+* **Error states.** With every API call failing, each mode shows an error
+  message with Try again; the progress card keeps its last data.
+* **Security review.** Every API route requires sign-in except the auth
+  routes and static files. All HTML built from strings escapes its values;
+  the newer modes use text nodes only.
+* **Integration tests** (`tests/test_integration.py`): Learn writes only
+  its own set, question and user (even when the same question is in two
+  sets); mistakes come only from recorded wrong answers (not reveals or
+  skips); Smart review schedules what other modes studied; practice history
+  survives set edits and deletion; flashcard labels change nothing else;
+  13 endpoints refuse another user's set; signed-out requests get 401.
 
 ## Grading
 

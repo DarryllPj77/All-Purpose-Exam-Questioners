@@ -491,9 +491,18 @@ function repairGeneratedQuestionStrings(source) {
     }).join('\n');
 }
 
+// Pasted arrays are read as data only (js/core/literal.js); nothing in them
+// is executed, and ${...} inside backticks stays plain text.
+function parseQuestionLiteral(source) {
+    if (!window.Quizer || !window.Quizer.literal) {
+        throw new Error('The question parser did not load. Refresh the page and try again.');
+    }
+    return window.Quizer.literal.parse(source);
+}
+
 function parseManualQuestionArray(source) {
     try {
-        return new Function('return ' + source)();
+        return parseQuestionLiteral(source);
     } catch (originalError) {
         const repairedSource = repairGeneratedQuestionStrings(source);
 
@@ -503,7 +512,7 @@ function parseManualQuestionArray(source) {
         }
 
         try {
-            return new Function('return ' + repairedSource)();
+            return parseQuestionLiteral(repairedSource);
         } catch (repairedError) {
             repairedError.manualImportSource = repairedSource;
             throw repairedError;

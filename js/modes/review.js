@@ -510,7 +510,9 @@
             const tag = (e.target && e.target.tagName) || '';
             if (tag === 'SELECT' || tag === 'INPUT') return;
             const ses = s.session;
-            if (e.key === 'Enter' && tag !== 'BUTTON') {
+            // Enter on a chosen answer checks it (Space still toggles the choice).
+            const onChoice = tag === 'BUTTON' && e.target.classList.contains('choice') && !ses.result && ses.selected.length > 0;
+            if (e.key === 'Enter' && (tag !== 'BUTTON' || onChoice)) {
                 e.preventDefault();
                 if (ses.result) next();
                 else if (s.format === 'choice' && ses.selected.length) submit({ format: 'choice', selected: ses.selected });

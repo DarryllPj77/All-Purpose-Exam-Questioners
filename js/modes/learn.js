@@ -641,7 +641,9 @@
             const tag = (e.target && e.target.tagName) || '';
             if (tag === 'INPUT' || tag === 'TEXTAREA') return; // the typed-answer form handles Enter
             const cur = s.current;
-            if (e.key === 'Enter' && tag !== 'BUTTON') {
+            // Enter on a chosen answer checks it (Space still toggles the choice).
+            const onChoice = tag === 'BUTTON' && e.target.classList.contains('choice') && !cur.result && cur.selected.length > 0;
+            if (e.key === 'Enter' && (tag !== 'BUTTON' || onChoice)) {
                 e.preventDefault();
                 if (cur.result) next();
                 else if (cur.format === 'choice') checkChoice();

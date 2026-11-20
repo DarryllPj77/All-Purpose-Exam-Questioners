@@ -560,7 +560,9 @@
                 const keys = Object.keys(current().question.choices);
                 const at = e.key.toUpperCase().charCodeAt(0) - 65;
                 if (at >= 0 && at < keys.length) { e.preventDefault(); choose(keys[at]); }
-            } else if (e.key === 'Enter' && tag !== 'BUTTON') {
+            } else if (e.key === 'Enter' && (tag !== 'BUTTON'
+                || (e.target.classList.contains('choice') && !s.session.result && s.session.selected.length > 0))) {
+                // Enter on a chosen answer checks it (Space still toggles the choice).
                 e.preventDefault();
                 if (s.session.result) next(); else check();
             }

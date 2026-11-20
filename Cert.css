@@ -4509,3 +4509,14 @@ kbd {
     .pg-grid, .pg-sets { grid-template-columns: 1fr; }
     .pg .btn { min-height: 44px; }
 }
+
+/* ---- Phase 11 QA fixes -------------------------------------- */
+/* Soft text on a selected (primary-soft) row was 4.40:1; muted text is 6:1. */
+.pg-set[aria-pressed="true"] .pg-row__meta { color: var(--c-text-muted); }
+/* Touch screens: the drawer's links and buttons get full 44px targets. */
+@media (max-width: 1024px) {
+    .side-nav__link { min-height: 44px; }
+    .icon-btn { width: 44px; height: 44px; flex-shrink: 0; }
+    .code-block__copy { min-height: 44px; }
+    .skip-link { min-height: 44px; display: inline-flex; align-items: center; }
+}
