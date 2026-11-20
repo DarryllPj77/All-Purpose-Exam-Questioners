@@ -88,7 +88,39 @@
         };
     }
 
-    const logic = { MODES, modeLabel, relativeTime, niceMax, percent, shortDay, activitySummary, practiceSummary };
+    // ---- "Continue studying" rows the learner removed -------------------------
+    // Removing a row only hides it; saved progress is untouched. A hidden row
+    // comes back as soon as that mode is studied again (newer activity).
+    const CONTINUE_SHOWN = 4;
+    const HIDDEN_DAYS = 90;
+
+    function continueKey(item) {
+        const m = MODES[item.mode];
+        return m && !m.perSet ? item.mode : `${item.setId}|${item.mode}`;
+    }
+
+    /** Rows to show: not hidden, or studied again after they were hidden. */
+    function visibleContinue(items, hidden, limit) {
+        const h = hidden || {};
+        return (items || []).filter((it) => {
+            const at = h[continueKey(it)];
+            return !at || (it.at && new Date(it.at) > new Date(at));
+        }).slice(0, limit == null ? CONTINUE_SHOWN : limit);
+    }
+
+    /** Drop hide records older than HIDDEN_DAYS so storage stays small. */
+    function pruneHidden(hidden, now) {
+        const ref = now instanceof Date ? now : new Date();
+        const out = {};
+        Object.entries(hidden || {}).forEach(([k, at]) => {
+            const t = new Date(at);
+            if (!Number.isNaN(t.getTime()) && ref - t < HIDDEN_DAYS * 864e5) out[k] = at;
+        });
+        return out;
+    }
+
+    const logic = { MODES, modeLabel, relativeTime, niceMax, percent, shortDay, activitySummary, practiceSummary,
+        continueKey, visibleContinue, pruneHidden, CONTINUE_SHOWN };
 
     // ---- Browser controller ----------------------------------------------------
 
@@ -175,10 +207,68 @@
         $('pgDue').textContent = String(t.reviewDue);
     }
 
-    function renderContinue(items) {
+    // Hidden rows are kept per user in this browser.
+    function hiddenKey() {
+        // eslint-disable-next-line no-undef
+        const user = typeof currentUser !== 'undefined' ? currentUser : null;
+        return user && user.id != null ? 'quizer:continueHidden:u' + user.id : null;
+    }
+    function loadHidden() {
+        const key = hiddenKey();
+        if (!key) return {};
+        try { return pruneHidden(JSON.parse(root.localStorage.getItem(key) || '{}')); } catch (_) { return {}; }
+    }
+    function saveHidden(hidden) {
+        const key = hiddenKey();
+        if (!key) return;
+        try { root.localStorage.setItem(key, JSON.stringify(hidden)); } catch (_) { /* storage full or blocked */ }
+    }
+
+    function removeContinue(it) {
+        const hidden = loadHidden();
+        const key = continueKey(it);
+        const previous = Object.prototype.hasOwnProperty.call(hidden, key) ? hidden[key] : undefined;
+        hidden[key] = new Date().toISOString();
+        saveHidden(hidden);
+        const rows = [...$('pgContinue').children];
+        const at = rows.findIndex((li) => li.dataset.key === key);
+        renderContinue(s.data.continue);
+        const label = modeLabel(it.mode) + (MODES[it.mode] && MODES[it.mode].perSet ? ' · ' + it.setTitle : '');
+        showContinueStatus(`Removed ${label}. It comes back when you study it again.`, () => {
+            const h = loadHidden();
+            if (previous === undefined) delete h[key]; else h[key] = previous;
+            saveHidden(h);
+            renderContinue(s.data.continue);
+            hideContinueStatus();
+            const back = $('pgContinue').querySelector(`[data-key="${CSS.escape(key)}"] .btn`);
+            if (back) back.focus();
+        });
+        // Keep keyboard focus nearby: the row that moved up, else Undo.
+        const next = $('pgContinue').children[Math.min(at, $('pgContinue').children.length - 1)];
+        const target = next ? next.querySelector('.pg-remove') : $('pgContinueUndo');
+        if (target) target.focus();
+    }
+
+    function showContinueStatus(message, undo) {
+        const box = $('pgContinueStatus');
+        $('pgContinueStatusText').textContent = message;
+        const btn = $('pgContinueUndo');
+        btn.onclick = undo;
+        box.hidden = false;
+    }
+    function hideContinueStatus() {
+        $('pgContinueStatus').hidden = true;
+        $('pgContinueStatusText').textContent = '';
+    }
+
+    function renderContinue(allItems) {
+        const items = visibleContinue(allItems, loadHidden());
         const list = $('pgContinue');
         list.replaceChildren();
         $('pgContinueEmpty').hidden = items.length > 0;
+        $('pgContinueEmpty').textContent = (allItems || []).length && !items.length
+            ? 'You removed everything here. Rows come back when you study again.'
+            : 'Nothing to continue yet. Pick a study mode below to start.';
         items.forEach((it) => {
             const li = el('li', 'pg-row');
             const text = el('div', 'pg-row__text');
@@ -188,7 +278,17 @@
             btn.type = 'button';
             btn.setAttribute('aria-label', `Continue ${modeLabel(it.mode)}${MODES[it.mode] && MODES[it.mode].perSet ? ' with ' + it.setTitle : ''}`);
             btn.addEventListener('click', () => continueWith(it, btn));
-            li.append(text, btn);
+            const remove = el('button', 'pg-remove');
+            remove.type = 'button';
+            remove.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6 6 18"/></svg>';
+            const what = modeLabel(it.mode) + (MODES[it.mode] && MODES[it.mode].perSet ? ', ' + it.setTitle : '');
+            remove.setAttribute('aria-label', `Remove ${what} from Continue studying`);
+            remove.title = 'Remove from this list';
+            remove.addEventListener('click', () => removeContinue(it));
+            const actions = el('div', 'pg-row__actions');
+            actions.append(btn, remove);
+            li.dataset.key = continueKey(it);
+            li.append(text, actions);
             list.appendChild(li);
         });
     }

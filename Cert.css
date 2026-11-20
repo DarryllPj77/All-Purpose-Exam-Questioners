@@ -4520,3 +4520,51 @@ kbd {
     .code-block__copy { min-height: 44px; }
     .skip-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
+
+/* Continue studying: remove a row (hides it; progress is kept) */
+.pg-row__actions { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
+.pg-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    color: var(--c-text-soft);
+    cursor: pointer;
+    transition: color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+.pg-remove:hover { color: var(--c-text); background: var(--c-surface-2); border-color: var(--c-border); }
+.pg-remove:active { transform: translateY(1px); }
+.pg-remove:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+.pg-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-3);
+    margin: var(--s-3) 0 0;
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--c-border);
+    border-radius: var(--r-md);
+    font-size: 13.5px;
+    color: var(--c-text-muted);
+}
+.pg-status[hidden] { display: none; }
+.pg-status__undo {
+    min-height: 32px;
+    padding: 0 var(--s-3);
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--c-primary-ink);
+    font: 600 13px/1 var(--ff-sans);
+    cursor: pointer;
+}
+.pg-status__undo:hover { background: var(--c-surface-2); }
+.pg-status__undo:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+@media (max-width: 1024px) {
+    .pg-remove { width: 44px; height: 44px; }
+    .pg-status__undo { min-height: 44px; }
+}

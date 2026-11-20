@@ -40,7 +40,8 @@ bp = Blueprint("dashboard", __name__)
 
 ACTIVITY_DAYS = 14
 PRACTICE_HISTORY = 10
-CONTINUE_LIMIT = 4
+# The browser shows 4; extra entries fill in for ones the learner removed.
+CONTINUE_LIMIT = 12
 MATURE_DAYS = 21
 GRADED_OUTCOMES = ("correct", "incorrect", "partial")
 # Study views a "continue" link can open; exam and training have their own

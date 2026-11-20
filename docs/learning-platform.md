@@ -425,6 +425,11 @@ fire-and-forget and never affects the score or the results screen.
   the mode works on one set, then opens the mode, which resumes where its
   own saved state left off. Exam and training keep the dashboard's existing
   "Continue session" button.
+  Each row has a remove button (×). Removing only hides the row, never the
+  saved progress, and an Undo appears; a hidden row comes back by itself
+  the next time that mode is studied on that set. Hidden rows are kept in
+  this browser for the signed-in user (`localStorage`, entries expire
+  after 90 days); the server sends up to 12 rows so the list still shows 4.
 * **Your sets:** most recently studied first (never-studied sets after,
   newest first); choosing one shows its five measures.
 * **Charts** (plain HTML and CSS, one series and one axis each, a tooltip
@@ -622,6 +627,9 @@ the test suites.
   address (a LAN IP, a deployed domain), it calls the address it came
   from. So a second test server on another port must be opened by its LAN
   address, not `localhost`.
+
+* Removed "Continue studying" rows are remembered per browser, not per
+  account, so another device still shows them.
 
 ## Future enhancements
 
