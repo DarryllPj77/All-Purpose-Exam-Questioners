@@ -1,7 +1,8 @@
 # Learning platform: architecture and progress
 
-This document tracks the multi-mode learning platform work. It describes
-only what is implemented and verified; planned work is listed separately.
+This document describes the multi-mode learning platform as built. It covers
+only what is implemented and verified; ideas for later are under
+[Future enhancements](#future-enhancements).
 
 ## Status
 
@@ -19,16 +20,48 @@ only what is implemented and verified; planned work is listed separately.
 | 8 | Matching | Committed (`bca38dc`) |
 | 9 | Code challenge | Committed (`27916ea`) |
 | 10 | Unified dashboard | Committed (`0fbd58a`) |
-| 11 | Testing, optimisation and QA | Implemented, not yet committed |
+| 11 | Testing, optimisation and QA | Committed (`cd80aff`) |
+| 12 | Documentation and final review | Implemented, not yet committed |
+
+## Study modes at a glance
+
+Eight study modes, plus the original exam and training sessions. Each keeps
+its own measure (see [Progress model](#progress-model)).
+
+| Mode | What the learner does | How it is scored | Saved progress |
+|---|---|---|---|
+| Exam / Training | Timed or guided run through the set | Exact-match choices, in the browser | Score in `session_history`; each answer in the answer log (saved sets only, not the built-in demo bank) |
+| Flashcards | Flip cards, label Know / Still learning | Not scored (self-labels) | `flashcard_status`; deck position in `study_sessions` |
+| Learn | Adaptive rounds until mastery | On the server: choices, typed answers (normalised), or self-rated recall | `learn_*` stage and streak; round in `study_sessions` |
+| Active recall | Answer without choices, reveal, rate | Self-rating; typed text also checked against accepted answers | `recall_rating`; session in `study_sessions` |
+| Smart review | Spaced repetition across all sets | On the server: choices or self-rated recall | `srs_*` schedule |
+| Practice test | Configurable test under exam rules | Exact-match choices; pass mark per test | Result in `session_history` with settings and time |
+| Mistake review | Retry questions missed anywhere | On the server: exact-match choices | `mistake_*` status; resolved after 2 correct retries in a row |
+| Matching | Pair questions with answers, relaxed or timed | First-try match = correct | Best time and accuracy per round size in `study_sessions` |
+| Code challenge | Read code; predict output, find bugs, and more | On the server: choices, or typed output (normalised); nothing is run | Answer log; session in `study_sessions` |
+
+The dashboard's "Your progress" card shows these measures side by side.
 
 ## Architecture
 
-* **Backend:** Flask blueprints. `progress_routes.py` holds the learning API;
-  every route is `login_required` and filters by the signed-in user, and
-  every question id is checked against the set it claims to belong to.
-* **Rules:** `learning_config.py` is the single source for modes, outcomes,
-  mastery thresholds and review intervals. The browser reads it from
-  `GET /api/learning/config`; nothing is duplicated in JavaScript.
+* **Backend:** Flask blueprints, one per area: `progress_routes.py` (answer
+  log, per-question progress, saved sessions, flashcard labels),
+  `learn_routes.py`, `recall_routes.py`, `review_routes.py`,
+  `mistakes_routes.py`, `code_routes.py`, `dashboard_routes.py`, plus the
+  original `auth.py`, `data_routes.py` (sets, history, active set and
+  session) and `server.py` (PDF generation, static files). Every learning
+  route is `login_required`, filters by the signed-in user, and checks each
+  question id against the set it claims to belong to.
+* **Database access:** `db.py` (`fetch_one`, `fetch_all`, `execute`,
+  `cursor`, `get_conn`) over a small per-process connection pool; see
+  [Quality checks](#quality-checks-phase-11).
+* **Rules:** `learning_config.py` holds the modes, outcomes, mastery
+  thresholds, review intervals, mistake rule, practice defaults and code
+  challenge types. The browser can read them from `GET /api/learning/config`,
+  and the dashboard receives the thresholds it shows. Some wording on screen
+  still states the defaults in text (for example the review intervals in
+  the Smart review header, and the challenge names in `js/core/code.js`);
+  change those too if a default changes.
 * **Frontend:** plain scripts, no build step, loaded in this order:
   `js/core/learning.js` (shared helpers and API client, `window.Quizer`),
   `js/core/code.js` (code display and highlighting, `Quizer.code`),
@@ -76,6 +109,26 @@ one number.
 
 All tables are created by `schema.sql` with `IF NOT EXISTS`; nothing existing
 was altered or dropped. Deleting a question set deletes its learning data.
+
+### Database changes and migration
+
+Every change is additive and applied by `schema.sql` on server start
+(`init_schema()`); no manual migration step is needed, and existing users,
+sets and history are untouched. All schema changes landed in Phase 1
+(`b6a9e2e`); phases 2 to 11 changed no tables.
+
+| Change | Phase | Notes |
+|---|---|---|
+| New table `question_attempts` (+ 2 indexes, unique `client_attempt_id` per user) | 1 | Append-only answer log |
+| New table `question_progress` (+ due-date index) | 1 | One row per user, set and question. Its flashcard, learn, recall, mistake and review columns were all designed in Phase 1, so later phases needed no schema change |
+| New table `study_sessions` | 1 | One saved state per user, set and mode |
+| `session_history`: new nullable `config`, `duration_seconds`, `client_attempt_id` (+ unique index per user) | 1 | Old rows keep working; only practice tests (Phase 3) fill them |
+| Question `id`s inside `question_sets.questions` (JSON) | 1 | Added on save, backfilled on first open; `updated_at` unchanged |
+| Optional question fields `acceptedAnswers`, `code`, `language`, `challenge`, `expectedOutput` (JSON) | 6, 9 | No schema change; validated on import |
+
+To undo the learning features, the three new tables and the three
+`session_history` columns can be dropped; the original exam, training,
+history and sets do not depend on them.
 
 ### Default rules (`learning_config.py`)
 
@@ -434,12 +487,27 @@ or run, not estimated.
   survives set edits and deletion; flashcard labels change nothing else;
   13 endpoints refuse another user's set; signed-out requests get 401.
 
-## Grading
+## Scoring
 
-`Quizer.learning.isCorrectAnswer` (in `js/core/learning.js`) is the one rule
-every mode uses, including the existing exam: the selected choices must be
-exactly the correct set, in any order. Partial multi-answer selections are
-incorrect.
+* **One choice rule everywhere:** the selected choices must be exactly the
+  correct set, in any order; a partial multi-answer pick is incorrect. In
+  the browser it is `Quizer.learning.isCorrectAnswer` (exam, training,
+  practice); on the server the same rule grades Learn, Mistake review,
+  Smart review and Code challenge, so those results cannot be changed from
+  the browser. Matching has its own rule: a pair is right when the answer
+  belongs to that question or has identical text.
+* **Typed answers** (Learn, Active recall): compared after `normalize_text`
+  (case, quotes, punctuation, spacing and a leading "a/an/the" ignored).
+  Python and JavaScript are tested against the same table.
+* **Typed output** (Code challenge): compared after unifying line endings
+  and dropping spaces at line ends and blank lines at the start and end;
+  letter case and everything else must match.
+* **Self-ratings** (Active recall, recall formats in Learn and Smart
+  review) are stored as self-assessed and never counted as graded accuracy.
+* **Practice pass mark:** compared on the exact ratio, so 69.6% never passes
+  a 70% mark although it displays as 70%. Unanswered counts as not correct.
+* **Dashboard accuracy:** graded answers only (correct / incorrect /
+  partial); flashcard flips, skipped questions and self-ratings excluded.
 
 ## Saved exam sessions
 
@@ -470,6 +538,43 @@ shared key is handed to the first account that signs in, then removed.
 | POST | `/api/code/<setId>/<questionId>/answer` | Grade a code challenge (`choice`, or typed `output` for output challenges); nothing is executed |
 | POST | `/api/history` | Now also accepts mode `Practice`, `config`, `durationSeconds` and `clientAttemptId` (a repeat returns the original row with `duplicate: true`) |
 
+Routes that existed before this work, unchanged in behaviour: `/api/auth/*`
+(register, login, logout, me), `/api/sets` (list, save, get, delete,
+stats), `/api/active-set`, `/api/active-session`, `/api/history` (list,
+get one, clear), `/api/analyze`, `/api/generate` and
+`/api/generate/status/<id>` (PDF to questions through OpenRouter).
+
+## UI design tokens
+
+All colours, spacing, radii, shadows, type and motion come from the
+`:root` block at the top of `Cert.css` (the calm blue theme). New screens
+use only these tokens; no colour is hard-coded in the learning features.
+
+| Group | Tokens |
+|---|---|
+| Grounds | `--c-bg-1` page `#101E2B`, `--c-bg-2` behind dialogs, `--c-surface` cards `#1B3042`, `--c-surface-2` raised items `#243B4F`, `--c-surface-3` / `--c-input` wells, `--c-code-bg` code |
+| Text | `--c-text` `#E1EBF4`, `--c-text-muted` `#AFC1D1`, `--c-text-soft` `#8FA6BA` |
+| Accent | `--c-primary` `#78A9D4`, `--c-primary-hover`, `--c-primary-ink` (accent text), `--c-primary-soft` (selected ground), `--c-on-primary` (text on filled buttons) |
+| Status | `--c-success*`, `--c-warning*`, `--c-danger*`, each with `-soft` ground and `-ink` text |
+| Lines | `--c-border`, `--c-border-strong` |
+| Spacing | `--s-1` 4px to `--s-16` 64px (4px steps up to 32px) |
+| Radius | `--r-sm` 8px, `--r-md` 10px, `--r-lg` 12px, `--r-xl` 14px, `--r-2xl` 18px, `--r-pill` |
+| Shadow | `--sh-1` to `--sh-4` |
+| Type | `--ff-sans` (Geist, Inter, system), `--ff-mono` (Geist Mono, JetBrains Mono, ...) |
+| Motion | `--t-fast` 120ms, `--t-base` 220ms, `--t-slow` 380ms, `--ease`, `--ease-out`, `--ease-spring` |
+
+Measured contrast (WCAG ratio) of the text colours on the page, a card and a
+raised item: text 14.0 / 11.2 / 9.6, muted 9.2 / 7.3 / 6.3, soft 6.7 / 5.4 /
+4.6, accent ink 9.1 / 7.3 / 6.2; text on a filled accent button 7.2. All meet
+4.5:1. Soft text on the selected-row ground (`--c-primary-soft`) is 4.4, so
+selected rows use muted text instead.
+
+Shared components reused by the modes: `.card`, `.btn` (`--primary`,
+`--secondary`, `--ghost`, `--sm`), `.mode-view` / `.mode-head`, `.ui-state`
+(loading, empty, error), `.score-card`, `.choice`, `.pt-feedback`,
+`.progress-bar`, `.ln-bar` (stacked bar), `.code-block`. Motion: a global
+`prefers-reduced-motion` rule stops animations and transitions.
+
 ## Tests
 
 ```bash
@@ -479,6 +584,17 @@ node --test tests/js
 
 The API tests use the database in `.env`, create throwaway `apitest_*` users
 and delete them afterwards. They are skipped if no database is reachable.
+
+| Suite | Files | What it covers |
+|---|---|---|
+| Python, no database | `test_question_ids.py`, `test_learning_config.py`, the grading and scheduling parts of the API tests | Question ids, config sanity, text normalisation, review intervals and time zones, code output rules |
+| Python, with database | `test_progress_api.py`, `test_mistakes_api.py`, `test_learn_api.py`, `test_recall_api.py`, `test_review_api.py`, `test_code_api.py`, `test_dashboard_api.py`, `test_integration.py`, `test_db_pool.py` | Every learning endpoint, ownership, idempotent resends, cross-mode rules, the connection pool |
+| JavaScript | `tests/js/*.test.js` | Pure logic of every mode, the shared core, the code highlighter and the import parser |
+
+Browser checks (desktop, tablet and phone sizes, keyboard, contrast, error
+states) were run by hand in each phase with scripted checks in the page;
+see [Quality checks](#quality-checks-phase-11). They are not automated in
+the test suites.
 
 ## Known limitations
 
@@ -495,3 +611,30 @@ and delete them afterwards. They are skipped if no database is reachable.
   tell whether a question's own snippet really behaves as its answer says.
 * The dashboard has no topic breakdown or mastery-over-time chart: the data
   for them is not recorded, and the dashboard does not estimate it.
+* Browser checks are scripted by hand per phase, not part of the automated
+  suites; reduced motion was confirmed from the CSS rule, not by emulation.
+* The dashboard's "Continue studying" opens a mode on the right set; each
+  mode then resumes from its own saved state (Matching rounds and Mistake
+  review rounds are not resumable by design).
+* Where the page sends API calls (`quizApiUrl` in `Cert.js`): opened from
+  `localhost` or `127.0.0.1` on any port, it calls port 5001 on that host;
+  opened as a file, it calls `http://127.0.0.1:5001`; opened from any other
+  address (a LAN IP, a deployed domain), it calls the address it came
+  from. So a second test server on another port must be opened by its LAN
+  address, not `localhost`.
+
+## Future enhancements
+
+Ideas only; none of these is implemented.
+
+* **Topic and difficulty fields** on questions, for topic performance on
+  the dashboard and filters in Practice and Mistake review.
+* **Mastery over time:** store Learn stage changes so progress can be shown
+  as a trend instead of a snapshot.
+* **Code execution** for code challenges, only inside an isolated sandbox
+  with time, memory and network limits, as the security rules require.
+* **Light theme** from the same token structure.
+* **Automated browser tests** (for example Playwright) for the checks now
+  run by hand in each phase.
+* **Configurable intervals** for Smart review per user, building on
+  `learning_config.SRS`.

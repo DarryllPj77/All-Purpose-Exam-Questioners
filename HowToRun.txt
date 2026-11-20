@@ -5,22 +5,31 @@ pip install -r requirements.txt
 
 Copy-Item .env.example .env
 # then edit .env and set:
-# OPENROUTER_API_KEY
 # POSTGRES_DSN
 # FLASK_SECRET_KEY
+# OPENROUTER_API_KEY   (only needed to generate questions from a PDF)
 
 python server.py
 
 Then open:
-http://127.0.0.1:5000/
+http://127.0.0.1:5001/
 
 Important
-The app expects a PostgreSQL database and a valid DSN in .env.example
-The app also needs a valid OpenRouter API key to generate questions
-If the virtual environment is already active, you can skip the activation step
+The app expects a PostgreSQL database and a valid POSTGRES_DSN in .env
+(the tables are created automatically on start).
+An OpenRouter API key is needed only for "Generate from PDF"; every study
+mode works without it.
+If the virtual environment is already active, you can skip the activation step.
+
+Run the tests
+python -m unittest discover -s tests -t .
+node --test tests/js
+
 If you want the shortest version
 
 cd "E:\Darryll pogi\FEU files Darryll\File for 2nd Year 3rd Sem\ADET Lec\xampp\htdocs\All Purpose Exam Questioners"
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python server.py
+
+More detail: README.md and docs/learning-platform.md

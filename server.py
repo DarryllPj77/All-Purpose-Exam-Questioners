@@ -42,7 +42,7 @@ Run:
     pip install -r requirements.txt   # flask, psycopg2-binary, etc.
     # set POSTGRES_DSN and FLASK_SECRET_KEY in .env
     python server.py
-    # then open http://127.0.0.1:5000/
+    # then open http://127.0.0.1:5001/
 """
 
 from __future__ import annotations
