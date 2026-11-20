@@ -70,14 +70,59 @@ The dashboard's "Your progress" card shows these measures side by side.
   `js/shell.js` (sidebar, header and question navigator), `js/progress.js`
   (the dashboard's "Your progress" card), then one file per
   study mode in `js/modes/` (`flashcards.js`, `learn.js`, `recall.js`,
-  `review.js`, `practice.js`, `mistakes.js`, `matching.js`, `code.js`).
+  `review.js`, `practice.js`, `mistakes.js`, `matching.js`, `code.js`),
+  then `js/router.js` and one module per page in `js/pages/`.
+* **Pages and routes:** see [Pages and routes](#pages-and-routes).
 * **Study mode views:** each mode is a full-page `.mode-view` inside the app
-  shell, opened from a tile in the dashboard's "Study modes" section or from
-  the sidebar. `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
+  shell, opened from a tile on the Dashboard page or from the sidebar, over
+  whichever page is open (closing it returns to that page). `js/shell.js` keeps the list (`MODE_VIEWS`): opening a mode
   calls `closeModeViews(key)` so only one is ever open, and `showModeView()`
   swaps it in for the dashboard. Any sidebar link closes an open mode.
 * **Static files:** only the files listed in `PUBLIC_FILES` in `server.py`
   are served. Add new front-end files there.
+
+## Pages and routes
+
+Each sidebar destination is its own page, with its own URL and its own
+module; they share one app shell (sidebar and header).
+
+| Route | Page | Module | Contents |
+|---|---|---|---|
+| `/dashboard` | Dashboard | `js/pages/dashboard.js` | Welcome header and the study mode tiles |
+| `/questions` | Question library | `js/pages/questions.js` | Your sets: use, delete |
+| `/performance` | Performance history | `js/pages/performance.js` | Past exams, training and practice tests with details |
+| `/progress` | Your progress | `js/pages/progress.js` | The progress card (Phase 10) |
+| `/study` | Study session | `js/pages/study.js` | Start or continue an exam or training session |
+| `/generate-pdf` | Generate from PDF | `js/pages/generate-pdf.js` | Upload a PDF and generate a set |
+| `/import` | Import a set | `js/pages/import.js` | AI prompt and paste-in import |
+
+* **Router** (`js/router.js`, History API; there is no front-end
+  framework): only the active page is attached to the page outlet
+  (`<main id="dashboard">`, which keeps its old id because the exam and
+  study modes show and hide it). Other pages are detached from the
+  document, not hidden. Each page module can run code when it opens; for
+  example the library re-renders and the progress card refreshes.
+* **URLs:** Flask serves the app at every page path (`PAGE_ROUTES` in
+  `server.py`, kept in step with `ROUTES` in the router; a test checks
+  both against the markup), so Refresh, Back, Forward and typed or
+  bookmarked URLs open the right page. `/` and unknown paths go to
+  `/dashboard`; old in-page links such as `/#questionSetsSection` go to
+  their page. Assets load from absolute paths (`/Cert.css`, `/js/...`).
+* **Existing code keeps working:** `navigateToSection()` and the section ids
+  it was given (`questionSetsSection`, `studyCard`, ...) now open the
+  matching page. Code that updates a page that is not on screen (a PDF
+  generation finishing after you moved on, the library refreshing after
+  sign-in) still finds its elements: `document.getElementById` falls back
+  to detached pages when the normal lookup finds nothing.
+* **Leaving activities:** "Save and exit" from an exam and each mode's
+  Exit return to the page you were on; buttons labelled "Back to
+  dashboard" or "Return to dashboard" go to `/dashboard` (`data-go`).
+  Changing page, or pressing Back, while an exam or mode is open closes it
+  first (both save their state as before).
+* **Accessibility:** the active page's sidebar link is highlighted with
+  `aria-current`; the tab title and header show the page name; after a
+  page change, focus moves to the page's heading. Each page has one `h1`.
+  The entrance animation is skipped under reduced motion.
 
 ## Question ids
 
@@ -628,6 +673,8 @@ the test suites.
   from. So a second test server on another port must be opened by its LAN
   address, not `localhost`.
 
+* Study modes are views over the current page, not routes of their own,
+  so a mode cannot be bookmarked or reopened by URL.
 * Removed "Continue studying" rows are remembered per browser, not per
   account, so another device still shows them.
 

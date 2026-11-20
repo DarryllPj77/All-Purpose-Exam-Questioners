@@ -26,8 +26,13 @@ each keep their own progress.
   - **Matching:** pair questions with answers, relaxed or against the clock.
   - **Code challenge:** predict output, find bugs and syntax errors, complete
     code. Code is shown with highlighting and never executed.
-- **Your progress:** a dashboard card with each mode's measure side by side,
-  a "continue studying" list, 14-day activity and practice scores.
+- **Separate pages:** Dashboard (`/dashboard`), Question library
+  (`/questions`), Performance history (`/performance`), Your progress
+  (`/progress`), Study session (`/study`), Generate from PDF
+  (`/generate-pdf`) and Import a set (`/import`), each with its own URL, so
+  Back, Forward, Refresh and bookmarks work.
+- **Your progress:** each mode's measure side by side, a "continue
+  studying" list, 14-day activity and practice scores.
 - **Calm blue design:** one dark theme with tested contrast, keyboard access
   throughout, and reduced-motion support.
 
@@ -39,7 +44,8 @@ design tokens, tests and limits):
 
 - Python 3, Flask, psycopg2, gunicorn (production)
 - PostgreSQL
-- Plain HTML, CSS and JavaScript (no build step, no front-end framework)
+- Plain HTML, CSS and JavaScript (no build step, no front-end framework;
+  a small History API router in `js/router.js`)
 - OpenRouter API (PDF to questions only)
 
 ## Project setup

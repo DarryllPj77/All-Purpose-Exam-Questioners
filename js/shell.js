@@ -29,7 +29,7 @@ function closeModeViews(exceptKey) {
     });
 }
 
-/** Show one study-mode view (by element id), or the dashboard when null. */
+/** Show one study-mode view (by element id), or the page outlet when null. */
 function showModeView(viewId) {
     const dashboard = document.getElementById('dashboard');
     const exam = document.getElementById('examContainer');
@@ -82,8 +82,9 @@ function syncAppBar() {
         eyebrow.textContent = isTrainingMode ? 'Training session' : 'Exam session';
         title.textContent = activeQuestionSetTitle();
     } else {
+        const route = window.Quizer && Quizer.router && Quizer.router.current();
         eyebrow.textContent = 'Workspace';
-        title.textContent = 'Dashboard';
+        title.textContent = route ? route.title : 'Dashboard';
     }
     const setTitle = document.getElementById('quizSetTitle');
     if (setTitle) setTitle.textContent = activeQuestionSetTitle();
@@ -178,8 +179,17 @@ function toggleSidebar(force) {
 }
 
 function setActiveNav(target) {
+    // Page links use route names. Older callers pass section ids
+    // ('studyCard') or 'dashboard' when a mode or exam closes, which means
+    // "the page underneath"; study mode links keep their view ids.
+    let key = target;
+    const router = window.Quizer && Quizer.router;
+    if (router && !/View$/.test(String(target))) {
+        const route = target === 'dashboard' && router.current() ? router.current() : router.lookup(target);
+        if (route) key = route.name;
+    }
     document.querySelectorAll('.side-nav__link[data-nav-target]').forEach((link) => {
-        const active = link.dataset.navTarget === target;
+        const active = link.dataset.navTarget === key;
         link.classList.toggle('is-active', active);
         if (active) link.setAttribute('aria-current', 'true');
         else link.removeAttribute('aria-current');
@@ -187,6 +197,8 @@ function setActiveNav(target) {
 }
 
 function navigateToSection(target) {
+    // Pages are routes now (js/router.js); old section ids map to them.
+    if (window.Quizer && Quizer.router && Quizer.router.navigate(target)) return;
     // Leaving a live session keeps it resumable (same as "Save and exit").
     if (isExamVisible()) backToDashboard();
     const modeView = openModeView();
@@ -200,21 +212,6 @@ function navigateToSection(target) {
     const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     if (target === 'dashboard') window.scrollTo({ top: 0, behavior });
     else el.scrollIntoView({ behavior, block: 'start' });
-}
-
-function watchSectionsForNav() {
-    if (!('IntersectionObserver' in window)) return;
-    const ids = ['studyCard', 'generateCard', 'importCard', 'questionSetsSection', 'sessionHistory'];
-    const visible = new Map();
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0));
-        if (isExamVisible() || openModeView()) return;
-        if (window.scrollY < 80) { setActiveNav('dashboard'); return; }
-        let best = null; let bestRatio = 0;
-        ids.forEach((id) => { const r = visible.get(id) || 0; if (r > bestRatio) { best = id; bestRatio = r; } });
-        if (best) setActiveNav(best);
-    }, { threshold: [0, 0.25, 0.5, 0.75], rootMargin: '-70px 0px -35% 0px' });
-    ids.forEach((id) => { const el = document.getElementById(id); if (el) observer.observe(el); });
 }
 
 // ---- Wrap existing screen changes ---------------------------------------
@@ -238,18 +235,12 @@ function watchSectionsForNav() {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.side-nav__link[data-nav-target]:not([data-open-view])').forEach((link) => {
-        link.addEventListener('click', (event) => {
-            event.preventDefault();
-            navigateToSection(link.dataset.navTarget);
-        });
-    });
+    // Page links (<a data-route>) are handled by js/router.js.
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) toggleSidebar(false);
     });
     window.matchMedia('(min-width: 1025px)').addEventListener('change', (mq) => {
         if (mq.matches) toggleSidebar(false);
     });
-    watchSectionsForNav();
     syncAppBar();
 });

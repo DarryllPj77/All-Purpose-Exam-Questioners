@@ -401,7 +401,7 @@ function selectPromptQuestionType(type) {
     if (!PROMPT_QUESTION_TYPE_CONFIG[type]) return;
     selectedPromptQuestionType = type;
 
-    document.querySelectorAll('[data-prompt-type]').forEach((button) => {
+    (document.getElementById('importCard') || document).querySelectorAll('[data-prompt-type]').forEach((button) => {
         const selected = button.dataset.promptType === type;
         button.classList.toggle('is-selected', selected);
         button.setAttribute('aria-checked', selected ? 'true' : 'false');
@@ -2222,7 +2222,7 @@ function resetAnalysisState() {
     if (loading) loading.style.display = 'flex';
     if (result) result.style.display = 'none';
     if (hint) hint.textContent = '';
-    document.querySelectorAll('#countChips .chip').forEach((chip) => {
+    (document.getElementById('countChips') || document).querySelectorAll('.chip').forEach((chip) => {
         chip.classList.remove('chip--selected', 'chip--warn', 'chip--disabled');
         chip.disabled = false;
         chip.setAttribute('aria-checked', 'false');
@@ -2244,7 +2244,7 @@ function updateGenerateButton() {
 }
 
 function renderChips(analysis) {
-    document.querySelectorAll('#countChips .chip').forEach((chip) => {
+    (document.getElementById('countChips') || document).querySelectorAll('.chip').forEach((chip) => {
         const value = parseInt(chip.dataset.count, 10);
         chip.classList.remove('chip--selected', 'chip--warn', 'chip--disabled');
         chip.disabled = false;
@@ -2266,7 +2266,7 @@ function renderChips(analysis) {
 
 function selectChip(chip) {
     if (chip.disabled || chip.classList.contains('chip--disabled')) return;
-    document.querySelectorAll('#countChips .chip').forEach((c) => {
+    (document.getElementById('countChips') || document).querySelectorAll('.chip').forEach((c) => {
         c.classList.remove('chip--selected');
         c.setAttribute('aria-checked', 'false');
     });
@@ -2672,7 +2672,7 @@ function renderQuestionSets() {
         const main = document.createElement('div');
         main.className = 'qset-item__main';
 
-        const title = document.createElement('h4');
+        const title = document.createElement('h2');
         title.className = 'qset-item__title';
         title.textContent = s.title || 'Untitled set';
 
@@ -2828,7 +2828,7 @@ document.addEventListener('DOMContentLoaded', () => {
         handlePdfSelection(file);
     });
 
-    document.querySelectorAll('#countChips .chip').forEach((chip) => {
+    (document.getElementById('countChips') || document).querySelectorAll('.chip').forEach((chip) => {
         chip.addEventListener('click', () => selectChip(chip));
         chip.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {

@@ -4568,3 +4568,28 @@ kbd {
     .pg-remove { width: 44px; height: 44px; }
     .pg-status__undo { min-height: 44px; }
 }
+
+/* ============================================================
+   Pages (js/router.js): one route, one page in the outlet
+   ============================================================ */
+.page { display: flex; flex-direction: column; gap: var(--s-5); width: 100%; margin: 0 auto; }
+.page--narrow { max-width: 760px; }
+.page--medium { max-width: 980px; }
+.page--wide { max-width: none; }
+/* The card heading is the page's h1: same look as the old card h2, a step up. */
+.card-head h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    color: var(--c-text);
+}
+.card-head h1:focus { outline: none; }
+.card-head h1:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 4px; border-radius: 4px; }
+.dashboard-hero h1:focus { outline: none; }
+/* A short entrance when the page changes (cards inside keep their own). */
+.page--enter { animation: fade-in var(--t-base) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+    .page--enter { animation: none; }
+}

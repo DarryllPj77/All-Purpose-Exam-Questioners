@@ -371,7 +371,7 @@
 
     function measure(title, def, rows, bar) {
         const card = el('section', 'pg-measure');
-        const h = el('h5', 'pg-measure__title', title);
+        const h = el('h4', 'pg-measure__title', title);
         card.append(h, el('p', 'pg-measure__def', def));
         if (bar) card.appendChild(bar);
         const dl = el('dl', 'pg-measure__list');

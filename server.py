@@ -119,9 +119,21 @@ def _allow_cors(resp):
 # Static
 # ============================================================
 
+# Every page of the app is a route (js/router.js). The server returns the same
+# shell for each, so Refresh, Back/Forward and typed URLs all work; the router
+# then shows the right page. Keep this list in step with ROUTES in router.js.
+PAGE_ROUTES = ("/dashboard", "/questions", "/performance", "/progress",
+               "/study", "/generate-pdf", "/import")
+
+
 @app.route("/", methods=["GET"])
 def index():
     return send_from_directory(SCRIPT_DIR, "Index.html")
+
+
+for _path in PAGE_ROUTES:
+    app.add_url_rule(_path, endpoint="page" + _path.replace("/", "_").replace("-", "_"),
+                     view_func=index, methods=["GET"])
 
 
 # Only the files the page itself loads are public. Everything else in the
@@ -131,6 +143,8 @@ PUBLIC_FILES = frozenset({
     "Index.html", "Cert.css", "Cert.js", "questions.js",
     "js/core/learning.js", "js/core/literal.js", "js/core/code.js", "js/shell.js", "js/progress.js", "js/modes/flashcards.js",
     "js/modes/practice.js", "js/modes/mistakes.js", "js/modes/learn.js", "js/modes/recall.js", "js/modes/review.js", "js/modes/matching.js", "js/modes/code.js",
+    "js/router.js", "js/pages/dashboard.js", "js/pages/questions.js", "js/pages/performance.js",
+    "js/pages/progress.js", "js/pages/study.js", "js/pages/generate-pdf.js", "js/pages/import.js",
 })
 
 
