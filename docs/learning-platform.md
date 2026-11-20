@@ -21,7 +21,7 @@ only what is implemented and verified; ideas for later are under
 | 9 | Code challenge | Committed (`27916ea`) |
 | 10 | Unified dashboard | Committed (`0fbd58a`) |
 | 11 | Testing, optimisation and QA | Committed (`cd80aff`) |
-| 12 | Documentation and final review | Implemented, not yet committed |
+| 12 | Documentation and final review | Committed (`592a5be`) |
 
 ## Study modes at a glance
 
